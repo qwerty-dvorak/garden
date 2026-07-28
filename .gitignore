@@ -1,0 +1,17 @@
+# build output
+garden
+*.o
+compile_commands.json
+
+# Mounts are symlinks to absolute paths on one machine — they mean nothing
+# in a clone, and committing them leaks your directory layout. Recreate with:
+#   ln -s /path/to/dir site/mnt/name
+site/mnt/*
+!site/mnt/.gitkeep
+
+# Media is generated. Keep the sources elsewhere; the encoding commands are
+# in blocks/colophon.note.
+site/media/*.webm
+site/media/*.mp4
+site/media/*.opus
+site/media/*.mp3

@@ -1,0 +1,59 @@
+title    colophon
+date     2026-07-29
+tags     meta build
+stage    evergreen
+---
+## what this is
+
+Every page here is a plaintext file in `blocks/`, parsed by ~450 lines of C and
+shaped by ~200 lines of Lua. No database, no npm, no framework, no analytics,
+no third-party requests of any kind. The absence is the point.
+
+## who does what
+
+C owns sockets, files, the loam parser, and escaping. Memory is one arena per
+request — every allocation a request makes comes out of it, and the whole thing
+is released in a single call when the response is written. There is no `free()`
+in the server.
+
+Lua owns page shapes. `lua/render.lua` is re-read on every request, so a
+template edit shows up on refresh with no restart and no recompile.
+
+## the freedom knobs
+
+Any block header may set `skin`, `font`, `fontsrc`, `size`, `measure`, `ink`,
+`paper`, `css`, and `class`. A page can ignore all of them or use every one and
+look like nothing else here. [[visual-poetry]] uses six.
+
+For anything a header line can't hold, write a stylesheet in `site/skins/` and
+name it with `skin`. For anything CSS can't do, use a `:::` block and write the
+HTML yourself.
+
+## encoding media
+
+    ffmpeg -i in.mov -c:v libsvtav1 -crf 45 -vf scale=640:-2 -an out.webm
+    ffmpeg -i out.webm -frames:v 1 poster.avif
+    ffmpeg -i in.wav -c:a libopus -b:a 32k out.opus
+
+Nothing autoplays. Nothing preloads. A clip waits to be asked for.
+
+## wasm
+
+`make wasm`. Freestanding wasm32, no emscripten, no libc — `clang` and `wasm-ld` only. A `.c` in
+`src/wasm/`, a handler in `site/js/wasm.js`, and `wasm  <name>` in a block header.
+
+[[mandelbrot|The set]] is 1.4KB, [[garden-of-life|Life]] is 1.8KB, [[crossword|the mini]] is 2KB.
+
+## making things disappear
+
+`draft  yes` removes a block completely — 404, and gone from every index, tag, backlink and
+transclusion. The file stays in the repo. [[library|Mounts]] are the opposite knob: things from
+outside the repo, made visible.
+
+`hidden  yes` is softer: reachable by URL, never listed.
+
+## honesty
+
+Every block currently in this garden is placeholder written to exercise the
+system, not to say anything. Delete all of it. [[anatomy]] is the format
+reference; keep that one until you have the syntax memorised.

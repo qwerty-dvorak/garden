@@ -1,0 +1,51 @@
+title    a mini, five by five
+date     2026-07-29
+tags     wasm puzzle play
+stage    budding
+wasm     crossword
+---
+Click the grid, then type. **Arrows** move, **tab** flips between across and
+down, **?** checks what you have, **!** reveals the current letter.
+
+The C owns the grid, the numbering and the answers. JavaScript draws a table
+and forwards keystrokes — it never sees the solution, which is the only honest
+way to ship a puzzle to a browser. **2KB** of wasm.
+
+## the clues
+
+:::
+<div class="clueset">
+<div><b>Across</b>
+<ol class="clues">
+<li value="1">Where the blood turns around</li>
+<li value="6">What is left when the fire gives up</li>
+<li value="7">Misuse, plainly</li>
+<li value="8">Pine's slow blood; amber before it was amber</li>
+<li value="9">The shape of a line, or the tyranny of one</li>
+</ol></div>
+<div><b>Down</b>
+<ol class="clues">
+<li value="1">The organ, or the courage</li>
+<li value="2">A coal still thinking about it</li>
+<li value="3">What a system does to the people inside it</li>
+<li value="4">A violinist rubs it on the bow</li>
+<li value="5">Statisticians love it; fashion needs it</li>
+</ol></div>
+</div>
+:::
+
+## the joke
+
+The solution is a *symmetric word square*: reading down gives the same five
+words as reading across. Across and down have different clues only so there is
+something left to solve.
+
+## numbering
+
+Standard crossword numbering is computed in C, not hardcoded — a cell takes the
+next number when nothing is filled to its left or above it. On a full square
+that means the top row and the left column, which is why it runs 1–5 along the
+top and 6–9 down the side. The rule generalises to grids with black squares
+without a line changing.
+
+See [[mandelbrot]] and [[garden-of-life]].

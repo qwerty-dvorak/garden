@@ -1,0 +1,19 @@
+title    everything should be fast
+date     2026-07-29
+tags     speed optimisation rot
+stage    budding
+contra   on-slowness
+---
+A page that takes two seconds to load has already lost the argument. Weight is
+a moral position: every kilobyte you ship is bandwidth someone else pays for,
+on a phone, on a train, on a plan that meters it.
+
+The whole of this site — parser, server, templates, stylesheet — is smaller
+than one JavaScript framework's *runtime*. That is not a boast. That is the
+baseline, and the industry has simply forgotten it.
+
+> Measured, not asserted: `make check` fails the build if any page goes over
+> budget. The machine holds the line, because I won't.
+
+See also [[phyllotaxis]] — an SVG that weighs less than the photograph of the
+thing it draws.

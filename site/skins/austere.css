@@ -1,0 +1,18 @@
+/* austere — the quiet skin. for things meant to be read, not performed.
+ *
+ * A skin may override anything in base.css, including all of it. This one
+ * barely does: it just narrows the measure and drops the contrast a little.
+ * Copy it to make a loud one. */
+
+:root {
+  --measure: 30rem;
+  --faint:   #9b968c;
+}
+
+h1, h2 { letter-spacing: .01em; }
+
+h1 {
+  font-weight: normal;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: .4rem;
+}

@@ -1,0 +1,16 @@
+title    a sine at 180hz
+date     2026-07-29
+tags     sound placeholder
+stage    seedling
+src      /media/tone.opus
+caption  six seconds of a sine wave. generated with ffmpeg, 18kb of opus.
+---
+Audio blocks carry `src` and `caption` in the header. The body is whatever you
+want to say about the sound.
+
+`preload="none"` is not optional — nothing downloads until someone presses
+play. One track left preloading on a page is heavier than every word on this
+site put together.
+
+Transclude this into a collection with `![[field-recording]]` and the player
+comes with it.

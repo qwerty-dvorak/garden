@@ -1,0 +1,234 @@
+/* base.css — the spine. Structure only.
+   Every value here is a placeholder you should replace with your own taste.
+   Skins live in skins/*.css and may override any of this, or all of it. */
+
+:root {
+  --ink:      #111;
+  --paper:    #f4f2ec;
+  --faint:    #8a857c;
+  --rule:     #d6d2c8;
+  --link:     #111;
+
+  --measure:  34rem;   /* readable line length. do not exceed ~40rem */
+  --step:     1.5rem;  /* vertical rhythm */
+
+  --body:     Georgia, 'Times New Roman', serif;
+  --mono:     ui-monospace, 'DejaVu Sans Mono', monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #e8e4da; --paper: #14140f; --faint: #7d786e; --rule: #2e2c26; --link: #e8e4da; }
+}
+
+html { font-size: 100%; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  line-height: 1.55;
+  max-width: var(--measure);
+  margin: var(--step) auto;
+  padding: 0 1rem;
+}
+
+/* nav, incoming, and footer survive every skin. someone lost in your
+   weirdest page must always be able to get out. */
+nav, footer      { font-family: var(--mono); font-size: .8rem; }
+nav a, footer a  { margin-right: .75rem; }
+
+a                { color: var(--link); text-underline-offset: .15em; }
+a:hover          { text-decoration: none; }
+
+h1, h2, h3       { font-weight: normal; line-height: 1.2; margin: calc(var(--step) * 1.5) 0 var(--step); }
+
+p, ul, ol, pre, figure { margin: 0 0 var(--step); }
+
+blockquote {
+  margin: var(--step) 0;
+  padding-left: 1rem;
+  border-left: 1px solid var(--rule);
+}
+
+/* a transcluded block: same content, rendered inside another block.
+   ![[id]] produces this. it must read as borrowed, not as body text. */
+.block {
+  margin: var(--step) 0;
+  padding-left: 1rem;
+  border-left: 1px solid var(--rule);
+}
+.block > .cite { font-family: var(--mono); font-size: .75rem; color: var(--faint); }
+
+/* marginalia — asides that argue with the body text.
+   inline on narrow screens, in the margin when there's room. */
+aside {
+  font-family: var(--mono);
+  font-size: .8rem;
+  color: var(--faint);
+  margin: var(--step) 0;
+}
+@media (min-width: 62rem) {
+  aside {
+    float: right;
+    clear: right;
+    width: 12rem;
+    margin: 0 -14rem var(--step) 0;
+  }
+}
+
+/* growth stage + rot. set by the generator from `stage` and `date`. */
+.stage           { font-family: var(--mono); font-size: .75rem; color: var(--faint); }
+
+/* the XXIIVV move: who points here. computed by reversing all edges. */
+.incoming        { font-family: var(--mono); font-size: .8rem; color: var(--faint); }
+.incoming ul     { list-style: none; padding: 0; display: inline; }
+.incoming li     { display: inline; margin-right: .6rem; }
+
+hr               { border: 0; border-top: 1px solid var(--rule); margin: calc(var(--step) * 2) 0; }
+
+/* media never auto-loads. poster frame + a click, always. */
+video, img       { max-width: 100%; height: auto; display: block; }
+
+figure           { margin-inline: 0; }
+figcaption       { font-family: var(--mono); font-size: .75rem; color: var(--faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ---------- verse: whitespace preserved to the column ----------
+   what concrete poetry needs and markdown cannot do. */
+pre.verse {
+  font-family: var(--mono);
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.35;
+  margin: calc(var(--step) * 1.5) 0;
+  tab-size: 4;
+}
+
+/* ---------- media ---------- */
+figure.media          { margin: var(--step) 0; }
+figure.media audio    { width: 100%; }
+figure.media video    { width: 100%; background: #000; }
+figure.media img      { border: 1px solid var(--rule); }
+
+/* a transcluded media block sits closer than a transcluded quote */
+blockquote.block.audio,
+blockquote.block.video,
+blockquote.block.image { border-left: 0; padding-left: 0; }
+
+/* ---------- indexes ---------- */
+ul.index      { list-style: none; padding: 0; }
+ul.index li   { margin-bottom: .35rem; }
+ul.index .stage { margin-left: .4rem; }
+
+.stage a      { color: var(--faint); margin-right: .4rem; }
+
+/* ---------- contradictions: two things that disagree, side by side ---------- */
+.contra {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin: calc(var(--step) * 2) 0;
+  padding-top: var(--step);
+  border-top: 1px solid var(--rule);
+}
+@media (min-width: 48rem) {
+  .contra { grid-template-columns: 1fr 1fr; }
+  .contra .side + .side { border-left: 1px solid var(--rule); padding-left: 1rem; }
+}
+.contra h3    { margin: 0 0 .5rem; font-size: .9rem; font-family: var(--mono); font-weight: normal; }
+.contra p     { margin-bottom: .6rem; }
+
+/* the contradictions page needs room the reading measure won't give */
+body.wide     { max-width: 58rem; }
+
+/* ---------- inline freedom: {cls|text} ---------- */
+mark        { background: #f5e17a; color: #111; padding: 0 .15em; }
+.huge       { font-size: 2.2em; line-height: 1; }
+.tiny       { font-size: .7em; }
+.wide-track { letter-spacing: .35em; }
+.tight      { letter-spacing: -.04em; }
+.sideways   { display: inline-block; transform: rotate(-90deg); }
+.upside     { display: inline-block; transform: rotate(180deg); }
+.faint      { opacity: .45; }
+.invert     { background: var(--ink); color: var(--paper); padding: 0 .2em; }
+.outline    { -webkit-text-stroke: 1px var(--ink); color: transparent; }
+.smallcaps  { font-variant: small-caps; letter-spacing: .06em; }
+
+/* ---------- toc: a way into a very long page ---------- */
+nav.toc {
+  font-family: var(--mono);
+  font-size: .8rem;
+  border-left: 2px solid var(--rule);
+  padding-left: 1rem;
+  margin: var(--step) 0 calc(var(--step) * 2);
+}
+nav.toc b   { display: block; color: var(--faint); font-weight: normal; margin-bottom: .4rem; }
+nav.toc ol  { margin: 0; padding-left: 1.2rem; }
+nav.toc li  { margin-bottom: .2rem; }
+
+h2:target   { background: #f5e17a33; }
+
+/* ---------- mounted directories ---------- */
+ul.dir          { list-style: none; padding: 0; font-family: var(--mono); font-size: .85rem; }
+ul.dir li       { margin-bottom: .2rem; }
+ul.dir li.dir a { font-weight: bold; }
+ul.dir li::before { content: "· "; color: var(--faint); }
+ul.dir li.dir::before { content: "▸ "; color: var(--faint); }
+
+/* ---------- experimental scroll ---------- */
+body.scroll-horizontal          { max-width: none; }
+body.scroll-horizontal article  { column-width: 20rem; column-gap: 3rem; height: 78vh; }
+
+/* ---------- lens ---------- */
+.lens {
+  position: fixed; width: 3rem; height: 3rem; margin: -1.5rem 0 0 -1.5rem;
+  border: 1px solid var(--ink); border-radius: 50%;
+  pointer-events: none; opacity: 0; transition: opacity .15s;
+  display: grid; place-items: center; color: var(--faint); z-index: 10;
+}
+.lens.on  { opacity: .5; }
+.lit      { font-size: 1.35em; background: #f5e17a22; transition: font-size .12s; }
+.lens-hint{ text-align: right; }
+
+/* ---------- wasm ---------- */
+.wasm         { margin: calc(var(--step) * 1.5) 0; }
+.wasm:focus   { outline: 1px dashed var(--faint); outline-offset: .5rem; }
+pre.ascii {
+  font-family: var(--mono);
+  font-size: clamp(4px, 1.35vw, 11px);
+  line-height: 1.0;
+  white-space: pre;
+  overflow-x: auto;
+  letter-spacing: 0;
+  margin: 0;
+}
+
+/* ---------- crossword ---------- */
+table.xword       { border-collapse: collapse; margin: var(--step) 0; }
+table.xword td {
+  width: 2.6rem; height: 2.6rem;
+  border: 1px solid var(--ink);
+  position: relative;
+  text-align: center;
+  vertical-align: middle;
+  font-family: var(--mono);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+table.xword td b {
+  position: absolute; top: 1px; left: 3px;
+  font-size: .55rem; font-weight: normal; color: var(--faint);
+}
+table.xword td.cur   { background: #f5e17a55; }
+table.xword td.right { color: #2e7d4f; }
+table.xword td.wrong { color: #b3402e; }
+table.xword:focus    { outline: none; }
+.wasm.solved table.xword td { border-color: #2e7d4f; }
+
+ol.clues        { font-size: .9rem; }
+ol.clues li     { margin-bottom: .3rem; }
+.clueset        { display: grid; gap: 0 2rem; grid-template-columns: 1fr; }
+@media (min-width: 40rem) { .clueset { grid-template-columns: 1fr 1fr; } }

@@ -1,0 +1,28 @@
+title    handmade
+date     2026-07-29
+tags     html meta experiment
+stage    seedling
+---
+<p>This block is a <code>.html</code> file. The body is emitted <em>exactly</em>
+as written — no parsing, no escaping, no opinion. When the markup is the point,
+the markup is the point.</p>
+
+<table style="border-collapse:collapse;font-family:var(--mono);font-size:.8rem">
+  <tr><th style="text-align:left;padding-right:1.5rem">construct</th><th style="text-align:left">escapes</th></tr>
+  <tr><td>ordinary body text</td><td>everything</td></tr>
+  <tr><td><code>:::</code> fence</td><td>nothing, inside the fence</td></tr>
+  <tr><td><code>.html</code> block</td><td>nothing, the whole file</td></tr>
+</table>
+
+<details style="margin:1.5rem 0">
+  <summary style="cursor:pointer">a details element, because why not</summary>
+  <p style="margin-top:.5rem">You get the whole language. <code>&lt;details&gt;</code>,
+  <code>&lt;dialog&gt;</code>, <code>&lt;svg&gt;</code>, a form, a table, whatever.</p>
+</details>
+
+<svg viewBox="0 0 200 40" width="100%" height="40" role="img" aria-label="a hand-drawn rule">
+  <path d="M2 20 Q 50 6, 100 20 T 198 20" fill="none" stroke="currentColor" stroke-width="1.2"/>
+</svg>
+
+<p class="stage">Same trust model as the <code>:::</code> fence: your own files,
+your own disk. Nothing a visitor writes ever reaches this path.</p>

@@ -1,0 +1,69 @@
+title    concrete
+date     2026-07-29
+tags     poetry rot form
+stage    budding
+skin     poem-rot
+font     var(--mono)
+paper    #0d0d0a
+ink      #d9d4c6
+measure  46rem
+---
+Whitespace here is preserved to the column. The `~~~` block is verbatim — what
+concrete poetry needs and what markdown will not give you.
+
+~~~
+                    r o o t
+                  r o o t
+                r o o t
+              r o o t
+            r o o t
+          r o o t
+        r o o t
+      r o o t
+    r o o t
+  r o o t
+r o o t
+  r o t
+    r o t
+      r o t
+        r o t
+          r o t
+            r o t
+              r o t
+                r o t
+                  r o t
+                    r o t
+~~~
+
+> The shape is the argument. Prose would need a paragraph to say what the
+> missing `o` says in one column.
+
+## the raw hatch
+
+Below the fold is a `:::` block: raw HTML, passed through untouched. No
+escaping, no parsing, no opinion. It is the freedom knob — this is your own
+file on your own disk, so the markup can do anything the browser can do.
+
+:::
+<div style="display:grid;grid-template-columns:repeat(9,1fr);gap:2px;margin:2rem 0">
+  <span style="grid-column:1/-1;font-size:.7rem;letter-spacing:.4em;opacity:.5">DECAY  MAP</span>
+  <span style="aspect-ratio:1;background:#d9d4c6"></span>
+  <span style="aspect-ratio:1;background:#c4bfae"></span>
+  <span style="aspect-ratio:1;background:#a8a291"></span>
+  <span style="aspect-ratio:1;background:#8a8474"></span>
+  <span style="aspect-ratio:1;background:#6d6759"></span>
+  <span style="aspect-ratio:1;background:#514c41"></span>
+  <span style="aspect-ratio:1;background:#38342c"></span>
+  <span style="aspect-ratio:1;background:#221f1a"></span>
+  <span style="aspect-ratio:1;background:#14140f"></span>
+</div>
+:::
+
+~~~
+        the page is not a document
+        it is a  p l o t
+              things are planted in it
+                    some of them die
+~~~
+
+Everything above is placeholder. Replace it with your own. See [[colophon]].

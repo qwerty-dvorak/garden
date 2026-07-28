@@ -1,0 +1,14 @@
+title    something I am not ready to show
+date     2026-07-29
+tags     rot
+stage    seedling
+draft    yes
+---
+This block sets `draft  yes`.
+
+The file is on disk and in the repo. The site 404s it, and it is absent from
+the index, the tag pages, the contradictions, and every backlink list — as if
+it did not exist. Nothing links here because nothing *can* link here.
+
+Set `hidden  yes` instead when you want the softer version: reachable by
+anyone with the URL, but never listed anywhere.

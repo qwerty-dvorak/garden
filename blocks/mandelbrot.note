@@ -1,0 +1,37 @@
+title    the set, in text
+date     2026-07-29
+tags     maths wasm ascii
+stage    budding
+wasm     ascii
+class    wide
+---
+Below is the Mandelbrot set rendered as characters, computed in C compiled to
+`wasm32` — no emscripten, no libc, no toolchain past `clang` and `wasm-ld`.
+**1.4KB** of wasm.
+
+Press **space** to run the zoom, **r** to reset. Click it first so it has focus.
+
+## how the bytes cross over
+
+The C exports a `char*` into its own linear memory. On the JS side that memory
+is an `ArrayBuffer`, so the buffer becomes a `Uint8Array` view at that offset
+and a `TextDecoder` turns it into a string. Nothing is copied until we ask; no
+allocator is involved on either side.
+
+    char *buffer(void) { return buf; }
+    void  render(double t);
+
+That is the whole interface. Twelve lines of glue in `/js/wasm.js`.
+
+## no libm
+
+Freestanding means no `sin`, no `pow`, no `memset` — clang still *emits* calls
+to `memset` for zero-init, so the module supplies its own four-line version or
+the link fails. The zoom is a loop of multiplications rather than `pow()` for
+the same reason. Escape-time fractals are a good fit precisely because they
+need nothing but arithmetic.
+
+> The centre is a point on the boundary, so the zoom never runs out of
+> structure. It will keep finding detail until the doubles do.
+
+See also [[garden-of-life]] and [[crossword]].

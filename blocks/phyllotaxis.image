@@ -1,0 +1,17 @@
+title    phyllotaxis
+date     2026-07-29
+tags     maths nature form
+stage    evergreen
+src      /media/phyllotaxis.svg
+alt      900 dots placed at successive golden-angle rotations, forming spiral arms
+caption  900 points, each rotated 137.5° from the last.
+---
+The golden angle is `2π(1 − 1/φ)` ≈ 137.507°. Place seeds at successive
+multiples of it, with radius growing as `√n`, and no two ever line up — which
+is why sunflowers and pinecones do it.
+
+This is an SVG, so it is text, it scales forever, and it weighs nothing next to
+a photograph of the same thing.
+
+> Later this becomes a wasm piece instead of a static file: the same maths in
+> ~120 lines of C, drawing itself.

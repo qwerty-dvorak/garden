@@ -1,0 +1,29 @@
+title    library
+date     2026-07-29
+tags     mounts meta
+stage    budding
+---
+`site/mnt/<name>` is a symlink to a folder somewhere else on disk. Those are
+the only paths allowed to leave `site/`, and the only ones that get a directory
+listing — everything else on this site 404s rather than showing you a folder.
+
+    ln -s ~/repos/buks site/mnt/buks
+
+That's it. [[colophon|The mount]] then appears at `/mnt/buks`, browsable, with
+sizes, and files stream straight from disk — a 50MB PDF never touches the
+server's memory.
+
+## containment
+
+The textual `..` reject stops the obvious attack. Then `realpath()` of the
+resolved target must still sit under `realpath()` of the mount root, which also
+catches a symlink *inside* the mounted tree pointing at `/etc`. Dotfiles are
+never listed or served.
+
+## before you point this at the internet
+
+A mount publishes everything under it, recursively, to anyone who can reach the
+server. Right now that is localhost only. Check what is actually in the folder
+before this moves to a VPS — and note that mounts are in `.gitignore`, because
+a symlink to an absolute path means nothing in a clone and leaks your directory
+layout.

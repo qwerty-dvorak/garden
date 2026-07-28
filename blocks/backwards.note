@@ -1,0 +1,27 @@
+title    backwards
+date     2026-07-29
+tags     experiment scroll
+stage    seedling
+scroll   reverse
+paper    #0f0e0c
+ink      #cfc9bb
+align    right
+---
+This page sets `scroll  reverse`. Your wheel goes the other way. Down is up.
+
+It is disorienting, which is the point — a page is allowed to refuse the
+convention. `scroll  horizontal` is the other option, and it turns the article
+into columns you push sideways: [[sideways]].
+
+## the one rule
+
+Both bail out entirely under `prefers-reduced-motion`. Hijacking someone's
+scroll is precisely the class of thing that setting exists to stop, and an
+experimental site that ignores accessibility is just a badly built one.
+
+Ctrl+wheel is left alone so zoom still works.
+
+## other knobs on this page
+
+`paper` and `ink` invert the palette. `align  right` sets the text ragged-left.
+Neither needed a stylesheet — they are header lines.

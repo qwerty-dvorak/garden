@@ -1,0 +1,22 @@
+title    a thing nobody is steering
+date     2026-07-29
+tags     automata wasm ascii
+stage    budding
+wasm     life
+class    wide
+---
+Conway's Life, wrapping at the edges, in text. **1.8KB** of wasm.
+
+**space** runs it, **n** steps once, **r** reseeds. The seeding is `xorshift32`,
+so a given seed always grows the same garden.
+
+## why this is here
+
+A garden should contain something that is alive and not being steered. The
+rules are four lines; everything you will watch it do is emergent from them,
+and none of it is authored.
+
+The population counter is exported so the page can notice when the board dies
+or freezes — which it usually does, eventually. That is also the point.
+
+See [[mandelbrot|the set]] and [[crossword]].

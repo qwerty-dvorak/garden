@@ -1,0 +1,35 @@
+title    sideways
+date     2026-07-29
+tags     experiment scroll
+stage    seedling
+scroll   horizontal
+columns  0
+class    wide
+js       lens
+size     .95rem
+---
+The article is laid out in columns and scrolls sideways. Your wheel pushes it
+left and right instead of up and down.
+
+This page also loads `js  lens` — press **l** and a magnifier follows your
+pointer, enlarging whatever paragraph sits under it. Forty lines of vanilla JS,
+no dependencies, and it removes itself under reduced-motion.
+
+## why bother
+
+Because a page can be a room rather than a scroll, and because the constraint
+of a fixed height forces a different kind of writing. Columns break where the
+viewport says, not where you meant, and that argues with you.
+
+## the js hook
+
+Any block can set `js  name`, which loads `/js/name.js`. That is the whole
+mechanism. Write a file, name it in a header, and the page has behaviour.
+Nothing bundles, nothing compiles, nothing phones home.
+
+## limits
+
+A horizontal page is genuinely worse on a phone, and a lens is useless on a
+touchscreen. Both are here anyway. Not everything has to work everywhere —
+that is what [[backwards]] and this page are for, and why the rest of the site
+is boring on purpose.

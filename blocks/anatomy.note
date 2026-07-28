@@ -1,0 +1,27 @@
+title  anatomy of a block
+date   2026-07-29
+tags   rot meta
+stage  seedling
+skin   austere
+---
+This page is hand-written. It exists to fix the shape of a block before `garden.c` is
+written, so the generator has an output to aim at rather than a guess to encode. Every
+element below is one the generator must be able to emit.
+
+> Marginalia. This is where the page argues with itself. It sits in the margin above
+> 62rem and inline below it.
+
+The header above carries the growth stage and the date. A block that hasn't been touched
+in a long time says so. Nothing here pretends to be finished.
+
+## a transcluded block
+
+The construct below is a transclusion. The same file also lives at its own URL and inside
+any number of collections. One file, three lives — this is the whole design.
+
+![[some-quote]]
+
+## a contradiction
+
+Declared in the header as `contra`. Both blocks then appear paired on
+[[contradictions]]. The edge is symmetric — declaring it once is enough.

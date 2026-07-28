@@ -1,0 +1,23 @@
+/* poem-rot — a skin is a whole stylesheet, so it can do what a one-line
+   `css` header field cannot. This one makes the page a dark plot of ground. */
+
+body { padding-bottom: 6rem; }
+
+h1 {
+  font-family: var(--mono);
+  font-size: 2.6rem;
+  letter-spacing: -.04em;
+  text-transform: lowercase;
+  border: 0;
+}
+
+pre.verse {
+  font-size: .95rem;
+  line-height: 1.3;
+  color: var(--ink);
+  opacity: .92;
+}
+
+aside { border-left: 2px solid #3a352b; padding-left: .8rem; }
+
+article p { max-width: 32rem; }

@@ -1,0 +1,13 @@
+title    listening
+date     2026-07-29
+tags     sound collection
+stage    budding
+---
+A collection is a block whose body lists other blocks. Nothing special in the
+code — it is the same file format, the same parser, the same URL scheme. That
+is what "everything is a block" buys you.
+
+![[field-recording]]
+
+Because a collection is a block, a collection can hold a collection. Nesting
+comes free: [[seeing]].

@@ -1,0 +1,41 @@
+title    typography
+date     2026-07-29
+tags     type form meta
+stage    budding
+font     book
+leading  1.7
+measure  32rem
+---
+This page sets `font  book` in its header. The name is just a filename: drop
+`book.woff2` into `site/fonts/` and `/fonts.css` picks it up on the next
+request. No registration, no config, no build step.
+
+## per word, not just per page
+
+Inline, `{class|text}` wraps anything in a span. Every font in the folder also
+gets an `f-` class automatically, so a single word can change face:
+
+{f-grotesk|grotesk} · {f-serif|serif} · {f-mono|mono} · {f-book|book} ·
+{f-humanist|humanist} · {f-quran|quran}
+
+The same mechanism reaches everything else CSS can do:
+
+{huge|huge} · {tiny|tiny} · {wide-track|w i d e} · {tight|tight} ·
+{smallcaps|small caps} · {invert|inverted} · {outline|outline} ·
+{faint|faint} · {upside|upside}
+
+You can ==highlight== a phrase, make it **strong**, make it *emphatic*, or nest
+them: {f-mono|{invert|nested spans work}}.
+
+## adding your own
+
+Any class you define in a skin is immediately usable as `{myclass|word}`. The
+markup does not need to know the class exists — it just writes the span and
+lets CSS decide. That is the whole freedom mechanism: one syntax, unbounded
+vocabulary.
+
+> Six faces here are subsets of system fonts, 12–20KB each, cut to Latin-1 with
+> `pyftsubset`. The whole folder is 84KB. An unsubset TTF is often 700KB on its
+> own.
+
+See [[colophon]] for the subsetting command.
