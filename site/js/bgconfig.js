@@ -391,7 +391,7 @@
   /* --- permalink and reset ------------------------------------------------ */
   /* One place decides what a shared background looks like as a string, and
    * it is not this file — the gallery and the demo page have to agree. */
-  function permalink() { return S ? S.permalink(cfg) : location.origin + '/'; }
+  function permalink() { return S ? S.permalink(cfg) : location.origin + '/b/demo'; }
 
   var link = document.createElement('input');
   link.type = 'text';
