@@ -65,7 +65,7 @@ local SITE = { bg = "", bgchars = "", bgopts = "" }
 -- Pages whose own script needs the character engine even when they are not
 -- themselves wearing a background. Everything else gets the engine only when
 -- it has asked for a field.
-local NEEDS_TEXTMODE = { gallery = true, bgconfig = true }
+local NEEDS_TEXTMODE = { gallery = true, bgconfig = true, upload = true }
 
 local NAV = {
   { "/",                "index"         },

@@ -111,7 +111,7 @@ Logs: `/var/lib/garden/deploy.log`, and `journalctl -u garden-hook`.
 - The gallery is **publicly writable**. Submissions are rebuilt field by field
   against a whitelist rather than filtered: unknown keys are dropped, numbers
   are clamped to the range the control offers, enums must match exactly. Body
-  capped at 2K, five posts per minute per IP, two hundred entries total, and
+  capped at 2K, five posts per minute per IP, one hundred entries total, oldest dropped first, and
   no file uploads at all. There is no moderation — names are the one string
   strangers control, and they are rendered with `textContent`.
 - `garden.conf` is `640`, owned `root:<service user>`. It lives outside the

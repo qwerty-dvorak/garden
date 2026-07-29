@@ -58,6 +58,16 @@ it: a filter has to imagine every attack, a whitelist only has to name the ten t
 are allowed. Nothing submitted is executed, nothing submitted is a path, and no picture is
 accepted at all.</p>
 
+<p>A hundred entries at most, newest first; past that the oldest falls off the end.
+Anything you post gets a <b>delete</b> button. When the server accepts an entry it hands
+your browser a token and keeps only a hash of it, so it cannot tell who you are and does
+not need to — the only question a delete button has to answer is whether this is the
+browser that posted the thing. Clear your storage and the entry stays, unowned.</p>
+
+<p class="stage">The same list is on <a href="/b/ascii">the playground</a>, which is where
+you are more likely to be choosing a background in the first place. Pictures go in slots on
+<a href="/b/upload">their own page</a>.</p>
+
 <pre class="verse">block header   &lt;  localStorage  &lt;  query string
     lowest                            highest</pre>
 

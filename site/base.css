@@ -227,6 +227,18 @@ pre.ascii {
   line-height: 1.05;
   letter-spacing: 0;
 }
+
+/* The drift layer holds real anchors, and an anchor at `z-index: -1` is a
+   picture of a link. Negative layers paint below in-flow content, and hit
+   testing follows painting: <body> covers the column, so every floating link
+   under the prose was unclickable — which was most of them.
+
+   So this one layer comes forward. It stays inert to the pointer, and only
+   the anchors inside it take clicks back, so nothing else about the page
+   changes. The trade is honest and worth naming: the words now pass in front
+   of the prose rather than behind it. They are drawn in `--bg-lit`, which is
+   a few percent off the paper, and the layer is nearly all empty rows. */
+.bg-drift { z-index: 1; }
 /* No opacity here on purpose. The colour already carries the subtlety, so
    `fade` stays a plain multiplier the reader controls rather than something
    stacked on top of a value they cannot see. */

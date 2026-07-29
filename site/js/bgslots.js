@@ -33,6 +33,17 @@
   var STORE = 'images';
   var MAX_BYTES = 8 * 1024 * 1024;
 
+  /* Pictures that already ship with the site. They are what the picture
+   * programs fall back to when a slot is empty, which is the difference
+   * between /b/ascii showing what `ascii` and `mask` do and showing two
+   * blank rectangles. Both are already in site/media for other blocks, so
+   * this costs no new bytes. */
+  var SAMPLES = [
+    { url: '/media/life.png', name: 'life' },
+    { url: '/media/phyllotaxis.svg', name: 'phyllotaxis' }
+  ];
+  var SAMPLE_URL = SAMPLES[0].url;
+
   /* ---------- slot metadata (localStorage) ------------------------------ */
 
   function readSlots() {
@@ -187,6 +198,41 @@
    * backdrop — and build() asks for the picture again. Without the
    * distinction between "decoded just now" and "already had it", that is an
    * unbounded recursion that renders one frame and then hangs the tab. */
+  function fetchBlob(url, cb) {
+    var x = new XMLHttpRequest();
+    x.open('GET', url, true);
+    x.responseType = 'blob';
+    x.onload = function () { cb(x.status === 200 ? x.response : null); };
+    x.onerror = function () { cb(null); };
+    x.send();
+  }
+
+  function decode(blob, slot, then) {
+    var done = function (bitmap) {
+      loading = null;
+      forget();
+      cache.slot = slot;
+      cache.bitmap = bitmap;
+      cache.url = URL.createObjectURL(blob);
+      if (then) then(true, true);
+    };
+
+    /* An <img> decodes SVG, which createImageBitmap refuses in some browsers
+     * because a bare SVG has no intrinsic size. So it is both the fallback
+     * for old browsers and the retry when the fast path rejects — otherwise
+     * choosing the vector sample would silently render nothing. */
+    function viaImage() {
+      var img = new Image();
+      var url = URL.createObjectURL(blob);
+      img.onload = function () { done(img); };
+      img.onerror = function () { loading = null; URL.revokeObjectURL(url); };
+      img.src = url;
+    }
+
+    if (window.createImageBitmap) createImageBitmap(blob).then(done, viaImage);
+    else viaImage();
+  }
+
   function ensure(slot, then) {
     slot = String(slot);
     if (cache.slot === slot && cache.bitmap) { if (then) then(true, false); return; }
@@ -194,31 +240,21 @@
     loading = slot;
 
     getImage(slot, function (blob) {
-      if (!blob) {
-        loading = null;
-        forget();
-        if (then) then(false, false);
-        return;
-      }
+      if (blob) { decode(blob, slot, then); return; }
 
-      var done = function (bitmap) {
-        loading = null;
-        forget();
-        cache.slot = slot;
-        cache.bitmap = bitmap;
-        cache.url = URL.createObjectURL(blob);
-        if (then) then(true, true);
-      };
-
-      if (window.createImageBitmap) {
-        createImageBitmap(blob).then(done, function () { loading = null; });
-      } else {
-        var img = new Image();
-        var url = URL.createObjectURL(blob);
-        img.onload = function () { done(img); };
-        img.onerror = function () { loading = null; URL.revokeObjectURL(url); };
-        img.src = url;
-      }
+      /* An empty slot falls back to a picture that ships with the site,
+       * rather than to nothing. A program whose whole job is to transform an
+       * image has no honest way to render "no image", and a blank panel
+       * reads as broken rather than as empty. */
+      fetchBlob(SAMPLE_URL, function (sample) {
+        if (!sample) {
+          loading = null;
+          forget();
+          if (then) then(false, false);
+          return;
+        }
+        decode(sample, slot, then);
+      });
     });
   }
 
@@ -241,7 +277,7 @@
    * quantised to ten steps is still recognisably the photograph.
    */
   T.programs.ascii = {
-    desc: 'a picture from a slot, as characters',
+    desc: 'a photograph quantised to ten shades of punctuation',
     chars: ' .:-=+*#%@',
     settings: { fps: 4 },          /* a still image does not need sixty */
 
@@ -269,7 +305,7 @@
    * and the word "rot" produce neither a face nor the word.
    */
   T.programs.mask = {
-    desc: 'text and motion, clipped to the shape of a picture',
+    desc: 'a picture used as a stencil — drawing happens only inside it',
     chars: ' .:-=+*#%@',
     settings: { fps: 20 },
 
@@ -383,14 +419,32 @@
     x.send();
   }
 
-  function share(name, cfg, cb) {
+  /* Which entries this browser posted. The server hands back a token once,
+   * on creation, and stores only its hash — so this is the only copy, and
+   * losing it means losing the ability to delete, which is the correct
+   * trade for a gallery that asks nobody to have an account. */
+  var MINE_KEY = 'garden.gallery.mine';
+
+  function readMine() {
+    try { return JSON.parse(localStorage.getItem(MINE_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+
+  function writeMine(m) {
+    try { localStorage.setItem(MINE_KEY, JSON.stringify(m)); } catch (e) { /* ok */ }
+  }
+
+  function optsLine(cfg) {
     var o = cfg.opts || {}, parts = [];
     for (var k in o) if (o[k] !== '' && o[k] !== undefined) parts.push(k + '=' + o[k]);
+    return parts.join(' ');
+  }
 
+  function share(name, cfg, cb) {
     var body = 'name=' + encodeURIComponent(name || 'untitled') +
                '&bg=' + encodeURIComponent(cfg.bg || 'none') +
                '&chars=' + encodeURIComponent(cfg.chars || '') +
-               '&opts=' + encodeURIComponent(parts.join(' '));
+               '&opts=' + encodeURIComponent(optsLine(cfg));
 
     var x = new XMLHttpRequest();
     x.open('POST', '/api/gallery', true);
@@ -398,10 +452,105 @@
     x.onload = function () {
       var data = null;
       try { data = JSON.parse(x.responseText); } catch (e) { data = null; }
+      if (x.status === 201 && data && data.id && data.token) {
+        var mine = readMine();
+        mine[data.id] = data.token;
+        writeMine(mine);
+      }
       cb(x.status === 201, data, x.status);
     };
     x.onerror = function () { cb(false, null, 0); };
     x.send(body);
+  }
+
+  function unshare(id, cb) {
+    var mine = readMine();
+    var token = mine[id];
+    if (!token) { cb(false, 403); return; }
+
+    var x = new XMLHttpRequest();
+    x.open('DELETE', '/api/gallery', true);
+    x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    x.onload = function () {
+      if (x.status === 200 || x.status === 404) {
+        delete mine[id];              /* gone either way; stop offering it */
+        writeMine(mine);
+      }
+      cb(x.status === 200, x.status);
+    };
+    x.onerror = function () { cb(false, 0); };
+    x.send('id=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(token));
+  }
+
+  /* ---------- the gallery, as a list you can put anywhere ----------------
+   * Built here rather than in the two pages that show it, so /b/background
+   * and /b/ascii cannot drift apart. Everything a stranger wrote is set with
+   * textContent.
+   */
+  function galleryUI(host, onLoad) {
+    function draw() {
+      host.textContent = 'loading…';
+      gallery(function (entries) {
+        var mine = readMine();
+        host.textContent = '';
+
+        if (!entries.length) {
+          host.textContent = 'nothing shared yet. be the first.';
+          return;
+        }
+
+        entries.forEach(function (e) {
+          var line = document.createElement('div');
+          line.className = 'row shared';
+
+          var who = document.createElement('span');
+          who.textContent = e.name;
+
+          var what = document.createElement('code');
+          what.textContent = e.bg + (e.opts ? '  ' + e.opts : '');
+
+          var use = document.createElement('button');
+          use.type = 'button';
+          use.textContent = 'load';
+          use.addEventListener('click', function () {
+            var opts = {};
+            (e.opts || '').split(/\s+/).forEach(function (pair) {
+              var i = pair.indexOf('=');
+              if (i > 0) opts[pair.slice(0, i)] = pair.slice(i + 1);
+            });
+            var cfg = { bg: e.bg, chars: e.chars || '', opts: opts };
+            if (window.Backdrop) window.Backdrop.save(cfg);
+            if (onLoad) onLoad(cfg);
+          });
+
+          line.appendChild(who);
+          line.appendChild(what);
+          line.appendChild(use);
+
+          /* Only what this browser posted can be withdrawn, and only this
+           * browser knows which those are. */
+          if (mine[e.id]) {
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.textContent = 'delete';
+            del.title = 'you posted this one';
+            del.addEventListener('click', function () {
+              del.disabled = true;
+              unshare(e.id, function (ok) {
+                if (ok) draw();
+                else { del.disabled = false; del.textContent = 'failed'; }
+              });
+            });
+            line.appendChild(del);
+          }
+
+          host.appendChild(line);
+        });
+      });
+    }
+
+    draw();
+    return draw;
   }
 
   /* ---------- public ----------------------------------------------------- */
@@ -446,9 +595,25 @@
 
     has: function (n, cb) { getImage(n + 1, function (b) { cb(!!b); }); },
 
+    /* Put one of the site's own pictures into a slot, so there is something
+     * to point the picture programs at without hunting for a file. */
+    samples: SAMPLES,
+    putSample: function (n, url, cb) {
+      fetchBlob(url, function (blob) {
+        if (!blob) { cb(false, 'could not fetch it'); return; }
+        putImage(n + 1, blob, function (ok) {
+          if (ok && cache.slot === String(n + 1)) forget();
+          cb(ok, ok ? null : 'could not store');
+        });
+      });
+    },
+
     layer: layer,
     preload: preload,
     gallery: gallery,
-    share: share
+    galleryUI: galleryUI,
+    share: share,
+    unshare: unshare,
+    optsLine: optsLine
   };
 })();

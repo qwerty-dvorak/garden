@@ -41,7 +41,7 @@
 
 #define HDR_MAX     16384
 #define BODY_MAX    1048576      /* github push payloads are not small */
-#define GALLERY_CAP 200
+#define GALLERY_CAP 100          /* hard ceiling; GALLERY_MAX may lower it */
 #define ENTRY_MAX   1024
 #define LINE_MAX    2048
 
@@ -207,6 +207,7 @@ static char SECRET[256]    = "";
 static char REPO_DIR[512]  = ".";
 static char STATE_DIR[512] = "/var/lib/garden";
 static int  HOOK_PORT      = 8001;
+static int  GALLERY_MAX    = GALLERY_CAP;
 
 static void trim(char *s)
 {
@@ -239,6 +240,13 @@ static void load_conf(const char *path)
         else if (!strcmp(k, "REPO_DIR"))      snprintf(REPO_DIR, sizeof REPO_DIR, "%s", v);
         else if (!strcmp(k, "STATE_DIR"))     snprintf(STATE_DIR, sizeof STATE_DIR, "%s", v);
         else if (!strcmp(k, "HOOK_PORT"))     HOOK_PORT = atoi(v);
+        else if (!strcmp(k, "GALLERY_MAX")) {
+            int n = atoi(v);
+            /* The config may lower the ceiling but never raise it: the read
+             * buffer is sized from GALLERY_CAP, so a larger value would be a
+             * config file quietly deciding how much memory to allocate. */
+            if (n > 0 && n <= GALLERY_CAP) GALLERY_MAX = n;
+        }
     }
     fclose(f);
 }
@@ -560,12 +568,37 @@ static void gallery_path(char *out, size_t cap)
     snprintf(out, cap, "%s/gallery.tsv", STATE_DIR);
 }
 
-/* id, at, name, bg, chars, opts — tab separated, newest first. */
+/* A line is  id, at, tok, name, bg, chars, opts  — tab separated, newest
+ * first. `opts` is last because it is the only field allowed to contain
+ * spaces, and last means "the rest of the line".
+ *
+ * `tok` is sha256 of the secret handed back when the entry was posted. It
+ * proves nothing about who somebody is and is not meant to: it only says
+ * this browser is the one that submitted this entry, which is exactly the
+ * claim a delete button has to make. It is never sent to anyone. */
+#define FIELDS 7
+
+static int split_entry(char *line, char *f[FIELDS])
+{
+    char *p = line;
+    int i;
+    for (i = 0; i < FIELDS; i++) {
+        f[i] = p;
+        if (i < FIELDS - 1) {
+            char *t = strchr(p, '\t');
+            if (!t) return 0;
+            *t = '\0';
+            p = t + 1;
+        }
+    }
+    return 1;
+}
+
 static void gallery_get(int fd)
 {
     char path[600], *buf;
     char *out;
-    size_t o = 0, cap = GALLERY_CAP * ENTRY_MAX * 3;
+    size_t o = 0, cap = (size_t)GALLERY_CAP * ENTRY_MAX * 3;
     char *line, *save = NULL;
     int first = 1;
 
@@ -579,20 +612,9 @@ static void gallery_get(int fd)
     if (buf) {
         for (line = strtok_r(buf, "\n", &save); line;
              line = strtok_r(NULL, "\n", &save)) {
-            char *f[6], esc[ENTRY_MAX];
-            int i;
-            char *p = line;
+            char *f[FIELDS], esc[ENTRY_MAX];
 
-            for (i = 0; i < 6; i++) {
-                f[i] = p;
-                if (i < 5) {
-                    char *t = strchr(p, '\t');
-                    if (!t) break;
-                    *t = '\0';
-                    p = t + 1;
-                }
-            }
-            if (i < 5) continue;                       /* malformed, skip */
+            if (!split_entry(line, f)) continue;        /* malformed, skip */
             if (o + ENTRY_MAX * 2 >= cap) break;
 
             o += (size_t)snprintf(out + o, cap - o, "%s{", first ? "" : ",");
@@ -601,13 +623,14 @@ static void gallery_get(int fd)
             o += (size_t)snprintf(out + o, cap - o, "\"id\":\"%s\",", esc);
             json_escape(f[1], esc, sizeof esc);
             o += (size_t)snprintf(out + o, cap - o, "\"at\":\"%s\",", esc);
-            json_escape(f[2], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"name\":\"%s\",", esc);
+            /* f[2] is the token hash and stays here. */
             json_escape(f[3], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"bg\":\"%s\",", esc);
+            o += (size_t)snprintf(out + o, cap - o, "\"name\":\"%s\",", esc);
             json_escape(f[4], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"chars\":\"%s\",", esc);
+            o += (size_t)snprintf(out + o, cap - o, "\"bg\":\"%s\",", esc);
             json_escape(f[5], esc, sizeof esc);
+            o += (size_t)snprintf(out + o, cap - o, "\"chars\":\"%s\",", esc);
+            json_escape(f[6], esc, sizeof esc);
             o += (size_t)snprintf(out + o, cap - o, "\"opts\":\"%s\"}", esc);
         }
         free(buf);
@@ -616,6 +639,60 @@ static void gallery_get(int fd)
     o += (size_t)snprintf(out + o, cap - o, "]}");
     respond(fd, "200 OK", "application/json; charset=utf-8", out, o);
     free(out);
+}
+
+/* Remove one entry, if the caller can prove it posted it. */
+static void gallery_delete(int fd, const char *body)
+{
+    char id[32], token[128], want[65], path[600], tmp[620];
+    uint8_t dig[32];
+    char *old, *line, *save = NULL;
+    FILE *f;
+    int found = 0, denied = 0, kept = 0;
+
+    if (!field(body, "id", id, sizeof id) || !hex_ok(id)) {
+        json(fd, "400 Bad Request", "{\"error\":\"bad id\"}");
+        return;
+    }
+    if (!field(body, "token", token, sizeof token) || !token[0]) {
+        json(fd, "403 Forbidden", "{\"error\":\"no token\"}");
+        return;
+    }
+    { sha256 s; sha256_init(&s); sha256_update(&s, token, strlen(token));
+      sha256_final(&s, dig); }
+    hex(dig, 32, want);
+
+    gallery_path(path, sizeof path);
+    old = read_file(path, NULL);
+    if (!old) { json(fd, "404 Not Found", "{\"error\":\"no such entry\"}"); return; }
+
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    f = fopen(tmp, "w");
+    if (!f) { free(old); json(fd, "500 Internal Server Error", "{\"error\":\"cannot write\"}"); return; }
+
+    for (line = strtok_r(old, "\n", &save); line;
+         line = strtok_r(NULL, "\n", &save)) {
+        char copy[LINE_MAX], *fl[FIELDS];
+        snprintf(copy, sizeof copy, "%s", line);
+        if (split_entry(copy, fl) && !strcmp(fl[0], id)) {
+            if (same(fl[2], want)) { found = 1; continue; }   /* dropped */
+            denied = 1;
+        }
+        fprintf(f, "%s\n", line);
+        kept++;
+    }
+    fclose(f);
+    free(old);
+
+    if (!found) {
+        remove(tmp);
+        if (denied) json(fd, "403 Forbidden", "{\"error\":\"not yours\"}");
+        else        json(fd, "404 Not Found", "{\"error\":\"no such entry\"}");
+        return;
+    }
+
+    rename(tmp, path);
+    json(fd, "200 OK", "{\"ok\":true,\"remaining\":%d}", kept);
 }
 
 /* Crude, per-IP, in memory, and reset by a restart. It exists to stop a
@@ -653,7 +730,7 @@ static void gallery_post(int fd, const char *body, const char *ip)
 {
     char name[128], bg[64], chars[128], opts[512];
     char raw[512], id[16], path[600], tmp[620];
-    char stamp[32];
+    char stamp[32], token[33], tokhash[65];
     uint8_t dig[32];
     char hexbuf[65];
     char *old;
@@ -710,13 +787,32 @@ static void gallery_post(int fd, const char *body, const char *ip)
     gmtime_r(&now, &tmv);
     strftime(stamp, sizeof stamp, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 
+    /* The delete token. Random, returned once, and stored only as a hash —
+     * so the file that a deletion is checked against never contains anything
+     * that would let somebody perform one. */
+    {
+        uint8_t rnd[16];
+        FILE *ur = fopen("/dev/urandom", "rb");
+        size_t got = ur ? fread(rnd, 1, sizeof rnd, ur) : 0;
+        if (ur) fclose(ur);
+        if (got != sizeof rnd) {
+            json(fd, "500 Internal Server Error", "{\"error\":\"no entropy\"}");
+            return;
+        }
+        hex(rnd, sizeof rnd, token);
+        { sha256 s; sha256_init(&s); sha256_update(&s, token, strlen(token));
+          sha256_final(&s, dig); }
+        hex(dig, 32, tokhash);
+    }
+
     gallery_path(path, sizeof path);
     snprintf(tmp, sizeof tmp, "%s.tmp", path);
 
     f = fopen(tmp, "w");
     if (!f) { json(fd, "500 Internal Server Error", "{\"error\":\"cannot write\"}"); return; }
 
-    fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\n", id, stamp, name, bg, chars, opts);
+    fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+            id, stamp, tokhash, name, bg, chars, opts);
     kept = 1;
 
     old = read_file(path, NULL);
@@ -725,7 +821,9 @@ static void gallery_post(int fd, const char *body, const char *ip)
         for (line = strtok_r(old, "\n", &save); line;
              line = strtok_r(NULL, "\n", &save)) {
             if (!strncmp(line, id, 12) && line[12] == '\t') continue;  /* replaced */
-            if (kept >= GALLERY_CAP) break;
+            /* Newest first, so anything past the cap is the oldest there is
+             * and simply stops being written. */
+            if (kept >= GALLERY_MAX) break;
             fprintf(f, "%s\n", line);
             kept++;
         }
@@ -734,7 +832,7 @@ static void gallery_post(int fd, const char *body, const char *ip)
     fclose(f);
     rename(tmp, path);
 
-    json(fd, "201 Created", "{\"ok\":true,\"id\":\"%s\"}", id);
+    json(fd, "201 Created", "{\"ok\":true,\"id\":\"%s\",\"token\":\"%s\"}", id, token);
 }
 
 /* ----------------------------------------------------------------- status */
@@ -882,7 +980,20 @@ static void handle(int fd)
         goto done;
     }
 
-    json(fd, "405 Method Not Allowed", "{\"error\":\"GET or POST\"}");
+    if (!strcmp(method, "DELETE")) {
+        if (!strcmp(path, "/api/gallery")) {
+            if (!rate_ok(ip)) {
+                json(fd, "429 Too Many Requests", "{\"error\":\"slow down\"}");
+                goto done;
+            }
+            gallery_delete(fd, body);
+            goto done;
+        }
+        json(fd, "404 Not Found", "{\"error\":\"not found\"}");
+        goto done;
+    }
+
+    json(fd, "405 Method Not Allowed", "{\"error\":\"GET, POST or DELETE\"}");
 
 done:
     free(body);

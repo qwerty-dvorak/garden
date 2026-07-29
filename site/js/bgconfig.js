@@ -334,46 +334,10 @@
     var galleryWrap = document.createElement('div');
     galleryWrap.className = 'full gallery';
 
-    var showGallery = function () {
-      galleryWrap.textContent = 'loading…';
-      S.gallery(function (entries) {
-        galleryWrap.textContent = '';
-        if (!entries.length) {
-          galleryWrap.textContent = 'nothing shared yet. be the first.';
-          return;
-        }
-        entries.forEach(function (e) {
-          var line = document.createElement('div');
-          line.className = 'row shared';
-
-          /* textContent, not innerHTML. The name is the one string on this
-           * page written by somebody else. */
-          var who = document.createElement('span');
-          who.textContent = e.name;
-
-          var what = document.createElement('code');
-          what.textContent = e.bg + (e.opts ? '  ' + e.opts : '');
-
-          var use = document.createElement('button');
-          use.type = 'button';
-          use.textContent = 'load';
-          use.addEventListener('click', function () {
-            var opts = {};
-            (e.opts || '').split(/\s+/).forEach(function (pair) {
-              var i = pair.indexOf('=');
-              if (i > 0) opts[pair.slice(0, i)] = pair.slice(i + 1);
-            });
-            B.save({ bg: e.bg, chars: e.chars || '', opts: opts });
-            location.reload();
-          });
-
-          line.appendChild(who);
-          line.appendChild(what);
-          line.appendChild(use);
-          galleryWrap.appendChild(line);
-        });
-      });
-    };
+    /* The list itself is built by bgslots, so this page and /b/ascii cannot
+     * drift apart. Loading one here reloads, because the whole panel is
+     * built from the config it just replaced. */
+    var showGallery = S.galleryUI(galleryWrap, function () { location.reload(); });
 
     var shareRow = document.createElement('div');
     shareRow.className = 'full row';

@@ -74,4 +74,59 @@
     if (el) el.textContent = 'background is now ' + name +
       ' — it will stay that way on every page until you change it.';
   }
+
+  /* ---------- what other people left ------------------------------------
+   * The same list /b/background carries, built by the same function. This
+   * page is where somebody is already choosing a background by looking at
+   * it, so it is the right place to see what other people chose.
+   */
+  var shared = document.getElementById('shared');
+  var S = window.BgSlots;
+  if (shared && S) {
+    var list = document.createElement('div');
+    list.className = 'gallery';
+    shared.appendChild(list);
+
+    var redraw = S.galleryUI(list, function (cfg) {
+      note(cfg.bg);
+      window.scrollTo(0, 0);
+    });
+
+    var bar = document.createElement('div');
+    bar.className = 'row';
+
+    var name = document.createElement('input');
+    name.type = 'text';
+    name.placeholder = 'call it something';
+    name.setAttribute('spellcheck', 'false');
+
+    var send = document.createElement('button');
+    send.type = 'button';
+    send.textContent = 'share the current background';
+
+    var msg = document.createElement('span');
+    msg.className = 'stage';
+
+    send.addEventListener('click', function () {
+      if (!window.Backdrop) return;
+      var cfg = window.Backdrop.config();
+      if (!cfg.bg || cfg.bg === 'none') {
+        msg.textContent = 'pick a panel first — there is no background to share.';
+        return;
+      }
+      S.share(name.value, cfg, function (ok, data, status) {
+        msg.textContent = ok
+          ? 'shared. it is yours to delete.'
+          : status === 429 ? 'too many just now — wait a minute.'
+          : status === 400 ? 'the server would not take that one.'
+          : 'could not share.';
+        if (ok) redraw();
+      });
+    });
+
+    bar.appendChild(name);
+    bar.appendChild(send);
+    bar.appendChild(msg);
+    shared.appendChild(bar);
+  }
 })();

@@ -1,0 +1,45 @@
+title    pictures
+date     2026-07-29
+tags     ascii textmode meta
+stage    budding
+js       upload
+---
+<p>Three of the backgrounds read a picture instead of a formula. <code>image</code> shows it,
+<code>ascii</code> redraws it out of the charset, and <code>mask</code> uses it as a stencil
+that text and motion are only allowed to appear inside. All three take the picture from a
+slot, and there are five slots.</p>
+
+<p><b>Nothing here is uploaded.</b> The word is wrong and kept only because it is the word
+people look for. A picture you choose is decoded in this tab and written to IndexedDB on
+your own machine; no request carries it anywhere, and the server has no route that would
+accept one if it tried.</p>
+
+<div id="upload" class="bgform"></div>
+
+<noscript><p class="stage">This page is a file picker and a store. Without javascript there
+is neither.</p></noscript>
+
+<h2>the two that ship</h2>
+
+<p>Two pictures already in the site are offered as samples, so there is something to point
+the programs at without going and finding a file. <a href="/media/life.png">life</a> is a
+frame of Conway's life — high contrast, mostly empty, which is what makes it a good
+stencil. <a href="/media/phyllotaxis.svg">phyllotaxis</a> is a vector spiral, so it is all
+gentle gradient and no hard edge, which is the opposite problem and useful for exactly that
+reason.</p>
+
+<p class="stage">A slot with nothing in it falls back to the first of those rather than to
+nothing, which is why <a href="/b/ascii">the playground</a> shows the picture programs doing
+something instead of two blank rectangles. Put your own picture in a slot and that stops.</p>
+
+<h2>what to expect</h2>
+
+<pre class="verse">ascii   wants contrast. a flat photograph turns to mud —
+        push `ascii contrast` up until the shapes separate.
+mask    wants a subject. it draws only where the picture is
+        bright, so a dark photograph masks almost everything
+        away. invert it, or drop the threshold.</pre>
+
+<p><a href="/b/background">The knobs</a> are on their own page: which slot, how hard to read
+it, what text to pour into the stencil. <a href="/b/ascii">The playground</a> shows every
+program at once and is the fastest way to see whether a picture is worth keeping.</p>
