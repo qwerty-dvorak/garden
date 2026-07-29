@@ -471,7 +471,14 @@
    * something happening behind an essay. */
   function demoUrl(cfg) { return '/b/demo?' + toQuery(cfg); }
 
-  function permalink(cfg) { return location.origin + '/?' + toQuery(cfg); }
+  /* A link you send somebody is a link to the demo page, not to the index.
+   * The index is an essay with a background behind it, so a link to it opens
+   * on the one page where the thing being sent is the thing you cannot see —
+   * it looked, reasonably, like a link that had not worked.
+   *
+   * `/?bg=...` still applies a background, so links already sent keep doing
+   * what they did; nothing generates that form any more. */
+  function permalink(cfg) { return location.origin + demoUrl(cfg); }
 
   /* Read a background out of a query string. The inverse of toQuery, and the
    * reason the demo page needs no state of its own. */

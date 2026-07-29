@@ -529,15 +529,20 @@
         program.frame(ctx, grid);
       } else if (program.main) {
         var cols = grid.cols, rows = grid.rows, ch = grid.ch, main = program.main;
-        /* Clamped here rather than trusted: a program written against a ten
-         * glyph ramp will be handed a three glyph one the moment somebody
-         * sets `bgchars`, and an index past the end renders as the literal
-         * word "undefined" across the page. */
+        /* Called with the program as its receiver, like boot/frame/post/resize
+         * already were. A cached bare `main(...)` left `this` undefined, which
+         * costs nothing for a program that is pure arithmetic and breaks any
+         * program that read a setting off itself — `ascii` and `mask` threw on
+         * every cell of every frame and rendered a blank grid. */
         var top = grid.cs.last;
         for (var j = 0; j < rows; j++) {
           var offs = j * cols;
           for (var i = 0; i < cols; i++) {
-            var v = main(i, j, offs + i, ctx, grid);
+            /* Clamped rather than trusted: a program written against a ten
+             * glyph ramp is handed a three glyph one the moment somebody sets
+             * `bgchars`, and an index past the end renders as the literal word
+             * "undefined" across the page. */
+            var v = main.call(program, i, j, offs + i, ctx, grid);
             ch[offs + i] = v > 0 ? (v < top ? v | 0 : top) : 0;
           }
         }
@@ -555,8 +560,13 @@
       tick(t);
     }
 
+    /* Nothing draws before boot(). The observers below can both reach a frame
+     * on their own — one when the element scrolls into view, one when it is
+     * resized — and go() waits on document.fonts.ready, so either can win the
+     * race. A program that builds its state in boot() then meets a frame that
+     * has none of it: `warp` threw on every frame until it lost the race. */
     function start() {
-      if (running || !visible) return;
+      if (!booted || running || !visible) return;
       if (REDUCED.matches || opts.once) { still(); return; }
       running = true; last = 0; acc = 0;
       raf = requestAnimationFrame(loop);
@@ -571,6 +581,7 @@
      * alone. A still frame of a noise field is a texture; an animated one is
      * a hazard. Same rule the wasm pieces follow. */
     function still() {
+      if (!booted) return;
       stopLoop();
       ctx.time = 8000;   /* not zero: t=0 is degenerate in most programs */
       tick(performance.now());
