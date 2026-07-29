@@ -1,0 +1,47 @@
+title    the playground
+date     2026-07-29
+tags     ascii textmode
+stage    budding
+class    wide
+js       gallery
+---
+<p>Every program registered on the engine, running at once. Each panel is its own runner on
+its own grid; they pause the moment they leave the viewport, which is the only reason
+fourteen of them at the same time is a reasonable thing to do.</p>
+
+<p><b>Click a panel</b> to make it the background of every page here. <a href="/b/background">The
+knobs</a> are on their own page, and <a href="/b/textmode">the writeup</a> explains what the
+engine is and where it came from.</p>
+
+<p class="stage" id="gallery-note">The numbers on the right of each caption are its grid size
+and its measured frame rate.</p>
+
+<div id="gallery" class="gallery"></div>
+
+<noscript>
+  <p class="stage">This page is fourteen javascript programs drawing characters into a grid.
+  Without javascript there is nothing here at all — which is the correct outcome, since
+  none of it is content. The programs are in <code>site/js/programs.js</code> and the engine
+  is in <code>site/js/textmode.js</code>; both are plain files you can read.</p>
+</noscript>
+
+<h2>the ramps</h2>
+
+<p>A cell holds an index, not a character, so the alphabet is a separate decision from the
+program. These are the ones that ship. Any string works — dark on the left, light on the
+right.</p>
+
+<pre class="verse">standard   .:-=+*#%@
+long       .'`^",:;Il!i&gt;&lt;~+_-?][}{1)(|\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&amp;8%B@$
+block      ░▒▓█
+grade      ▁▂▃▄▅▆▇█
+dots       ·∙•●
+line       ╴╵└╶─┌┬╷┘│┤┴┼
+arrow      ↑↗→↘↓↙←↖
+stroke     /\|-_+*XY#
+binary     01</pre>
+
+<p class="stage">Yes, <code>&lt;</code> and <code>&amp;</code> are legal in a ramp. They are
+glyphs. Every glyph is escaped once when the ramp is loaded, into a parallel array the
+markup path indexes instead — so a ramp of <code>&nbsp;&lt;&amp;&gt;</code> draws angle
+brackets rather than breaking out of the document.</p>

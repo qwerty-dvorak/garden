@@ -1,0 +1,27 @@
+# The site. A template: bootstrap.sh fills in __USER__ and __REPO_DIR__.
+#
+# WorkingDirectory is not a nicety. BLOCKS_DIR, SITE_DIR and LUA_RENDER in
+# garden.c are relative paths, so a garden started from anywhere else serves
+# nothing and says nothing about why.
+[Unit]
+Description=garden - personal site server
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__REPO_DIR__
+ExecStart=__REPO_DIR__/garden 8000
+Restart=always
+RestartSec=2
+
+# It binds loopback and reads a directory of text files. Nothing it does
+# needs write access to the disk or a privilege it did not start with.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,27 @@
+# The POST surface: the deploy webhook and the gallery api. A template:
+# bootstrap.sh fills in __USER__ and __REPO_DIR__.
+#
+# A second unit rather than a thread inside garden, because this is what
+# restarts garden — and a server cannot restart itself and still answer the
+# request that asked it to. It is also why garden.c stays a GET-only loop.
+#
+# Not hardened the way garden.service is: a deploy runs git and make over the
+# working tree, so ProtectHome would break the one thing this unit exists for.
+# What contains it is the surface — three routes, loopback only, the one that
+# does anything behind an HMAC.
+[Unit]
+Description=garden deploy hook and gallery api
+After=network.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__REPO_DIR__
+ExecStart=__REPO_DIR__/hookd /etc/garden/garden.conf
+Restart=always
+RestartSec=2
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

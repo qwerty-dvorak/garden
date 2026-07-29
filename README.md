@@ -100,6 +100,9 @@ nothing else on the site.
 | `scroll` | `reverse` (wheel inverted) or `horizontal` (columns, pushed sideways) |
 | `js` | loads `/js/<name>.js` |
 | `wasm` | loads `/wasm/<name>.wasm` and the glue that drives it |
+| `bg` | runs a character field behind the page. a program name, or `none` |
+| `bgchars` | the ramp that field is drawn with, dark to light |
+| `bgopts` | one line of `k=v` dials for it |
 | `draft` | `yes` removes the block completely — 404 on its own URL, gone from every index, tag, backlink and transclusion. The file stays on disk. |
 | `hidden` | `yes` is the softer version — reachable by URL, absent from all listings. |
 
@@ -142,6 +145,54 @@ JS side is just an `ArrayBuffer`.
 
 Every module pauses off-screen via `IntersectionObserver` and does not animate at all under
 `prefers-reduced-motion`.
+
+### The character field
+
+    site/js/textmode.js   the engine
+    site/js/programs.js   fourteen things to run on it
+    site/js/backdrop.js   the layer behind the page, and the floating links
+
+A page can wear a grid of characters behind it. The idea and several of the programs come
+from [ertdfgcvb](https://github.com/ertdfgcvb/play.core); the engine is a rewrite, because
+play.core keeps one object per cell and spreads a fresh copy of every cell every frame. Here
+a cell is two integers in two typed arrays and a frame allocates nothing.
+
+    bg      warp
+    bgchars  .:-=+*#%@
+    bgopts  fps=24 scale=1.4 fade=.3 drift=body seed=x word=gdn rd=coral
+
+Three fields rather than twelve, because a block only gets 32 (`LOAM_MAX_FIELDS`) and they
+are shared with `title`, `date`, `tags` and the rest. The dials go on one `bgopts` line the
+way `css` holds one line of CSS. Everything reaches the browser as `data-*` on `<body>`,
+escaped once — never as CSS, because `csssafe` only drops angle brackets and a ramp is
+allowed to *contain* angle brackets.
+
+**Off by default.** Set `SITE.bg` in `lua/render.lua` for a site-wide field. The three files
+are 64KB together, and the home page has 100KB to spend on everything — so turn it on for
+the pages that are about it, not for the whole garden. `bg  none` in a header opts one page
+out.
+
+Precedence is `block header < localStorage < query string`. A reader's stored preference
+beats the page's, which is the point; `/?bg=plasma&bgopts=speed%3D2` is a link to a specific
+field rather than to a page that happens to have one.
+
+**Two layers, and that is the performance story.** A grid with no styles and no links is
+written as one string and one `textContent` assignment for the whole screen. One coloured
+link in it would force every row to be built out of `<span>`s instead — so the field is one
+`<pre>` and the floating links are another, where nearly every row is empty, unchanged and
+skipped. Rows are compared as integers and only changed rows are written.
+
+The floating links are not new markup: they are the page's own nav and backlinks, harvested
+from the DOM and composited into the grid, so both layers are `aria-hidden` and `lynx` sees
+no duplicate list. They arrive by split-flap, counting up through the charset.
+
+Everything pauses off-screen and in a hidden tab, and under `prefers-reduced-motion` the
+field is composed exactly once and left alone. At 160×50, steady state, every program costs
+under 3ms a frame except the raymarcher, which is meant to be looked at rather than sat
+behind text.
+
+`/b/ascii` runs all of them at once, `/b/background` is the control panel, `/b/textmode`
+is what the deobfuscation turned up.
 
 ### Mounts
 
@@ -232,7 +283,8 @@ C only pushes header fields that exist, so optional fields arrive in Lua as `nil
 ## Status
 
 Working: the server, the loam parser, arena allocation, all eight block types, media,
-verse, raw blocks, per-page fonts and skins, collections, tag indexes, contradictions.
+verse, raw blocks, per-page fonts and skins, collections, tag indexes, contradictions,
+the character field and its fourteen programs.
 
 Not built yet: RSS, `garden build` (static output for the VPS), the guestbook, and the
 wasm pieces.

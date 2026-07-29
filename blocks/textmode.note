@@ -1,0 +1,120 @@
+title   the page as a grid of characters
+date    2026-07-29
+tags    ascii textmode graphics performance
+stage   budding
+bg      warp
+bgopts  fps=30 fade=.75 scale=.9 word=gdn drift=nav
+class   bg-panel
+---
+There is a field behind this text. It is a grid of characters, one per cell, redrawn
+thirty times a second, and it is not a picture of anything — it is a word being pulled
+apart by a noise function and put back together again.
+
+The idea is stolen wholesale from Andreas Gysin. What follows is what I found when I took
+his front page apart, and what I did differently.
+
+:::
+<p class="stage">
+  <a href="https://github.com/ertdfgcvb/play.core">github.com/ertdfgcvb/play.core</a> ·
+  <a href="https://ertdfgcvb.xyz">ertdfgcvb.xyz</a> ·
+  <a href="https://play.ertdfgcvb.xyz">the playground</a>
+</p>
+:::
+
+## the shape of the thing
+
+A *program* fills a grid. A *renderer* writes the grid to the DOM. That is the entire
+architecture, and it is better than it sounds, because it means the program never touches
+the document and the renderer never knows what it is drawing.
+
+    boot(ctx, g)      once, after the first measurement
+    frame(ctx, g)     the whole grid at once. the fast path.
+    main(x,y,i,ctx)   one cell, returns a glyph index. the readable path.
+
+A cell is not a character. It is an *index* into a ramp — `' .:-=+*#%@'` — so brightness
+and glyph are the same number, and `bgchars` can swap the alphabet under a running program
+without the program being told.
+
+## what the deobfuscation showed
+
+The front page ships as one 18KB minified module. Beaten back into shape, it turns out the
+renderer in production is byte-for-byte the algorithm in the public repo. There is no
+secret. The speed is in five specific decisions:
+
+**Two colours.** Every cell picks one of two, by a single threshold. A row of two hundred
+cells emits three or four `<span>`s rather than two hundred, because the renderer opens a
+new one only when the style actually changes.
+
+**A style equal to the container's is not emitted at all.** `cell.color === settings.color`
+becomes `null`, so long stretches are bare text inside one tag.
+
+**Only changed rows are written.** Each row is compared against a copy of the last frame,
+and `innerHTML` is assigned only where something moved.
+
+**A glyph→index map.** The letter animation asks "which index is this character" once per
+glyph per frame; `indexOf` over a hundred-glyph charset would put a linear scan on the hot
+path. One object literal removes it.
+
+**The overlay runs every other frame.** `frame % 2`. Nobody can see the difference.
+
+> The thing I expected to find and did not: any attempt to avoid allocation. The runner
+> does `buffer[idx] = {...buffer[idx], ...out}` for every cell of every frame, and the
+> renderer does `backBuffer[i] = {...cell}` for every changed cell. Fullscreen, that is
+> somewhere north of twenty thousand short-lived objects per frame. It runs at sixty
+> anyway, which says more about how good the collector has got than about the code.
+
+## what is different here
+
+A cell here is two integers in two typed arrays — `Uint16Array` for the glyph, `Uint8Array`
+for the style — sized once and mutated in place. After boot, a frame allocates nothing.
+
+Beyond that, four changes:
+
+**A monochrome fast path.** If no cell carries a style and no cell carries a link — the
+common case, and the case every backdrop is in — the frame is built as one string and
+assigned to `textContent` once. No spans, no parsing, one DOM write for the whole screen.
+
+**The rectangle is cached.** `getBoundingClientRect()` forces layout. play.core calls it
+inside the frame loop. Here it is read on resize and not again.
+
+**Glyphs are escaped once, at load.** The original writes `html += cell.char` straight into
+markup. Its own ramps are safe by construction, but this one can be handed a ramp from a
+block header, and `bgchars` is allowed to contain `<`, `&` and `>` — they are glyphs, and
+they are drawn as glyphs. A parallel array of entity-escaped strings is built when the ramp
+is loaded, and the markup path indexes that one.
+
+**Two layers, not one.** The field is monochrome and stays on the fast path; the floating
+links live on a second `<pre>` above it, where the slow path is affordable because almost
+every row of it is empty and therefore skipped.
+
+## the floating part
+
+The links drifting behind this page are not new markup. They are the page's own navigation
+and backlinks, harvested from the DOM and composited into a character grid — which is what
+Gysin's `post()` does with his `<main>`, and it is the right call: nothing floats back there
+that is not already reachable, so both layers are `aria-hidden` and nothing is duplicated
+for a screen reader or for `lynx`.
+
+They arrive by split-flap. A character does not appear; it counts up through the charset
+until it reaches the one it wants. Because the charset by then holds the ramp *and* every
+letter the links need, the words assemble out of the same texture the field is drawn from.
+
+## the cost
+
+Measured on this machine, at a hundred and sixty by fifty cells, steady state:
+
+    tenprint  0.05 ms      warp    0.98 ms      moire   2.5 ms
+    subdiv    0.09 ms      plasma  0.92 ms      rd      2.0 ms
+    rain      0.20 ms      strata  1.4 ms       sdf     8   ms
+    life      0.31 ms      spiral  1.1 ms
+
+At thirty frames a second, one millisecond of work is three per cent of one core. The
+budget is not the arithmetic; it is the DOM, and the monochrome path is there to keep the
+DOM out of it.
+
+Everything pauses off-screen and on a hidden tab, and under `prefers-reduced-motion` the
+field is composed exactly once and then left alone. A still noise field is a texture. A
+moving one, behind text, is a hazard.
+
+See [[ascii]] for all of them running at once, [[background]] to change the one behind this
+page, and [[abstract]] for the half that are not pictures of anything.

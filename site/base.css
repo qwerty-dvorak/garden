@@ -206,6 +206,169 @@ pre.ascii {
   margin: 0;
 }
 
+/* ---------- textmode: the field behind the page ----------
+   Two fixed <pre>s at z-index -1. body's own background propagates to the
+   canvas and is painted before them, so they sit between the paper and the
+   text without either needing a stacking context. Nothing here is content:
+   both layers are aria-hidden, both are inert to the pointer, and neither
+   exists at all until backdrop.js decides the page asked for one. */
+.bg-field, .bg-drift {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  margin: 0;
+  overflow: hidden;
+  white-space: pre;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+/* No opacity here on purpose. The colour already carries the subtlety, so
+   `fade` stays a plain multiplier the reader controls rather than something
+   stacked on top of a value they cannot see. */
+.bg-field { color: var(--bg-ink); }
+.bg-drift { color: var(--bg-lit); }
+
+/* A picture shown as a picture. The two character layers draw a background
+   out of glyphs; this one just is one, and putting it through the grid would
+   be an elaborate way of making it worse.
+
+   Same z-index and the same fixed box as the field, so a picture and a
+   program stack the way you would expect if you ever set both. Opacity is set
+   inline from `fade`, which is the same dial the field uses — one word for
+   one idea, whichever layer is carrying it. */
+.bg-image {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* the only clickable thing in either layer */
+.bg-drift a {
+  pointer-events: auto;
+  color: var(--bg-lit);
+  text-decoration: none;
+}
+.bg-drift a:hover { color: var(--ink); text-decoration: underline; }
+
+/* The field's two colours are mixed out of the page's own, not set
+   independently — `ink` and `paper` are per-page knobs, and a block that sets
+   `paper #0d0d0a` would otherwise get a near-white field on near-black paper.
+   The literals below are the fallback for browsers without color-mix; the
+   mixed values win everywhere else, and because custom properties resolve at
+   use time they pick up whatever `ink` and `paper` the header set. */
+:root { --bg-ink: #cfcabd; --bg-lit: #b3ad9e; }
+@media (prefers-color-scheme: dark) { :root { --bg-ink: #23231c; --bg-lit: #37362c; } }
+
+@supports (color: color-mix(in srgb, red, blue)) {
+  :root {
+    --bg-ink: color-mix(in srgb, var(--ink) 30%, var(--paper));
+    --bg-lit: color-mix(in srgb, var(--ink) 55%, var(--paper));
+  }
+}
+
+/* a page that is mostly field wants its prose to sit on something */
+body.bg-panel article,
+body.bg-panel > h1 {
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  padding: .1rem 1rem;
+  border-radius: 2px;
+}
+
+/* ---------- textmode: pieces embedded in a page ---------- */
+.tm {
+  margin: calc(var(--step) * 1.5) 0;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+.tm pre, .tm canvas {
+  display: block;
+  margin: 0;
+  width: 100%;
+  height: 14rem;
+  overflow: hidden;
+  white-space: pre;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.05;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tm figcaption {
+  border-top: 1px solid var(--rule);
+  padding: .35rem .6rem;
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.tm figcaption b { font-weight: normal; color: var(--ink); }
+.tm figcaption .ms { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.gallery { display: grid; gap: var(--step); grid-template-columns: 1fr; }
+@media (min-width: 52rem) { .gallery { grid-template-columns: 1fr 1fr; } }
+.gallery .tm pre { height: 11rem; font-size: 7px; }
+
+/* ---------- the background configurator ---------- */
+.bgform {
+  font-family: var(--mono);
+  font-size: .8rem;
+  display: grid;
+  gap: .5rem 1rem;
+  grid-template-columns: 7rem 1fr;
+  align-items: center;
+  margin: var(--step) 0;
+}
+.bgform label { color: var(--faint); }
+.bgform select, .bgform input {
+  font: inherit;
+  width: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  padding: .2rem .3rem;
+}
+.bgform input[type=range] { padding: 0; border: 0; }
+.bgform .row { display: flex; gap: .5rem; align-items: center; }
+.bgform output { color: var(--faint); min-width: 3rem; font-variant-numeric: tabular-nums; }
+.bgform .full { grid-column: 1 / -1; }
+
+/* Five slots and the shared list. Both are rows of controls that have to
+   survive a name long enough to wrap, so they scroll rather than stretch the
+   grid column that holds them. */
+.bgform .slots, .bgform .gallery {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.bgform .slot input[type=text] { flex: 1 1 6rem; min-width: 0; }
+.bgform .slot input[type=file] { flex: 0 1 9rem; min-width: 0; border: 0; padding: 0; }
+.bgform .slot button, .bgform .shared button { flex: 0 0 auto; padding: .15rem .5rem; }
+.bgform .shared { gap: .5rem; align-items: baseline; }
+.bgform .shared span { flex: 0 1 8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bgform .shared code { flex: 1 1 auto; color: var(--faint); font-size: .72rem;
+                       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bgform button[disabled] { opacity: .4; cursor: default; }
+.bgform button {
+  font: inherit;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  padding: .25rem .7rem;
+  cursor: pointer;
+}
+.bgform button:hover { background: var(--ink); color: var(--paper); }
+
 /* ---------- crossword ---------- */
 table.xword       { border-collapse: collapse; margin: var(--step) 0; }
 table.xword td {

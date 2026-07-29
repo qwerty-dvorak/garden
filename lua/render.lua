@@ -38,16 +38,40 @@ end
 -- every knob defaults to "" so shell() can test them without nil checks
 local KNOBS = { "skin","font","fontsrc","size","measure","ink","paper","rule","step",
                 "css","class","leading","tracking","weight","align","columns",
-                "scroll","js","wasm" }
+                "scroll","js","wasm","bg","bgchars","bgopts" }
 local function defaults(o)
   for _, k in ipairs(KNOBS) do o[k] = o[k] or "" end
   return o
 end
 
+-- Site-wide background. Set `bg` here and every page grows a character field
+-- behind it; a block header overrides it, and `bg  none` in a header turns it
+-- off for that page alone.
+--
+-- Off by default, and it should stay off unless you mean it: the three files
+-- it pulls in are about 30KB, and the home page has a 100KB budget it has to
+-- share with everything else. Turn it on for the pages that are about it.
+--
+-- Only three fields, not ten, because a block gets 32 header fields total
+-- (LOAM_MAX_FIELDS) and they are shared with title, date, tags and the rest.
+-- The dials live on one `bgopts` line, the way `css` holds a line of CSS.
+--
+--   bg      warp                      -- a program name, or `none`
+--   bgchars  .:-=+*#%@                -- the ramp, dark to light
+--   bgopts  fps=24 scale=1.4 fade=.3 drift=body seed=x word=gdn
+--
+local SITE = { bg = "", bgchars = "", bgopts = "" }
+
+-- Pages whose own script needs the character engine even when they are not
+-- themselves wearing a background. Everything else gets the engine only when
+-- it has asked for a field.
+local NEEDS_TEXTMODE = { gallery = true, bgconfig = true }
+
 local NAV = {
   { "/",                "index"         },
   { "/tags",            "tags"          },
   { "/contradictions",  "contradictions"},
+  { "/b/ascii",         "ascii"         },
   { "/mnt",             "mounts"        },
 }
 
@@ -115,7 +139,22 @@ local function shell(o)
   local bodycls = o.class
   if o.scroll == "reverse"    then bodycls = bodycls .. " scroll-reverse"    end
   if o.scroll == "horizontal" then bodycls = bodycls .. " scroll-horizontal" end
-  out[#out+1] = '</head>\n<body class="' .. esc(bodycls) .. '">\n<nav>'
+
+  -- The background travels to the browser as data-* on <body>, never as CSS.
+  -- csssafe() only drops angle brackets, which is the wrong guarantee for a
+  -- charset that came out of a header line; esc() into an attribute is the
+  -- right one, and it puts the whole feature outside the style path.
+  local bg      = safeid(o.bg ~= "" and o.bg or SITE.bg)
+  local bgchars = o.bgchars ~= "" and o.bgchars or SITE.bgchars
+  local bgopts  = o.bgopts  ~= "" and o.bgopts  or SITE.bgopts
+  local bgattrs = ""
+  if bg ~= "" and bg ~= "none" then
+    bgattrs = ' data-bg="' .. esc(bg) .. '"'
+    if bgchars ~= "" then bgattrs = bgattrs .. ' data-bgchars="' .. esc(bgchars) .. '"' end
+    if bgopts  ~= "" then bgattrs = bgattrs .. ' data-bgopts="'  .. esc(bgopts)  .. '"' end
+  end
+
+  out[#out+1] = '</head>\n<body class="' .. esc(bodycls) .. '"' .. bgattrs .. '>\n<nav>'
   for _, n in ipairs(NAV) do
     out[#out+1] = '<a href="' .. n[1] .. '">' .. n[2] .. '</a>'
   end
@@ -128,7 +167,36 @@ local function shell(o)
   if o.scroll == "reverse" or o.scroll == "horizontal" then
     out[#out+1] = '<script src="/js/scroll.js"></script>\n'
   end
+
+  -- Classic scripts, so load order is execution order: the engine, then the
+  -- programs that register themselves on it, then the slots and pictures,
+  -- then the thing that drives them all.
   local js = safeid(o.js)
+  if bgattrs ~= "" or NEEDS_TEXTMODE[js] then
+    out[#out+1] = '<script src="/js/textmode.js"></script>\n'
+    out[#out+1] = '<script src="/js/programs.js"></script>\n'
+    out[#out+1] = '<script src="/js/bgslots.js"></script>\n'
+    out[#out+1] = '<script src="/js/backdrop.js"></script>\n'
+  else
+    -- A page with no background of its own still honours a reader who picked
+    -- one, because they picked it for the site rather than for whichever
+    -- essay happened to offer the control.
+    --
+    -- Loading the engine unconditionally would put ~30K on every page to
+    -- serve a preference most readers never set, so these four lines look
+    -- first: no background and no preference ships no javascript at all.
+    -- async=false keeps injected scripts in document order, which the engine
+    -- needs.
+    out[#out+1] = '<script>\n'
+      .. '(function(){var q=location.search,s=null;\n'
+      .. 'try{s=JSON.parse(localStorage.getItem("garden.bg")||"null")}catch(e){}\n'
+      .. 'var want=(s&&s.bg&&s.bg!=="none")||q.indexOf("bg=")>0;\n'
+      .. 'if(!want)return;\n'
+      .. '["textmode","programs","bgslots","backdrop"].forEach(function(n){\n'
+      .. 'var e=document.createElement("script");e.src="/js/"+n+".js";\n'
+      .. 'e.async=false;document.head.appendChild(e)})})();\n'
+      .. '</script>\n'
+  end
   if js ~= "" then out[#out+1] = '<script src="/js/' .. js .. '.js"></script>\n' end
   if safeid(o.wasm) ~= "" then out[#out+1] = '<script src="/js/wasm.js"></script>\n' end
   out[#out+1] = '</body>\n</html>\n'

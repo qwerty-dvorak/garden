@@ -1,0 +1,82 @@
+title   fields, not pictures
+date    2026-07-29
+tags    ascii textmode maths abstract
+stage   seedling
+bg      rd
+bgopts  fps=20 fade=.65 drift=nav
+class   bg-panel
+contra  on-speed
+---
+Half the programs in [[textmode]] are ports — a flame, a maze, Conway, a word. They are
+pictures of things, and you can say what they are in one word.
+
+The other half are not. They have no subject. Something is iterated and what appears is a
+consequence nobody chose, which is a different kind of image and the one I actually wanted.
+
+## reaction–diffusion
+
+Two chemicals on a wrapping grid. One converts the other; both spread; one is fed in and
+one is drained off. Four constants:
+
+    feed 0.078   kill 0.061   Da 1.0   Db 0.5
+
+That is the entire program. Nothing in it mentions coral, or fingerprints, or the coat of a
+big cat, and all of them come out of it depending on where you put those two numbers — so
+they are a knob rather than something you have to go and edit. `bgopts rd=coral`, or
+`worms`, `spots`, `holes`, `uskate`, `mitosis`, `solitons`. The field behind this page is
+that rule, six iterations a frame.
+
+> Two things cost me an hour each, and neither was code.
+>
+> The first was the Laplacian. With the obvious five-point one — up, down, left, right,
+> minus four — the largest eigenvalue is −8, so `Da·dt·|λ|` is 8, the integration is
+> unstable at `dt = 1`, and the field oscillates itself flat inside a few hundred steps. It
+> looks *exactly* like the seeds dying. The nine-point kernel — `0.05` on the diagonals,
+> `0.2` on the orthogonals — sums to magnitude one and is stable. Every working
+> implementation uses it and almost none of them say why.
+>
+> The second only shows up on small grids. A pattern has a wavelength, the grid wraps, and
+> if the grid is shorter than the wavelength the pattern meets its own wrapped copy and
+> annihilates. `mitosis` is beautiful at three hundred columns and a dead blank rectangle
+> at ninety. I measured all seven regimes from 40×12 up to 300×90; `worms` is the only one
+> alive at every size, which is why it is the default and `mitosis` — the one I started
+> with, and the one I wanted — is not.
+
+## signed distance
+
+A function that, given a point, returns the distance to the nearest surface. Walk a ray
+forward by whatever that function returns, repeatedly, and you cannot overshoot — so you
+arrive at the surface without ever having stored one. There is no geometry anywhere in the
+program. A torus is:
+
+    length(vec2(length(p.xz) - 1, p.y)) - 0.35
+
+Shade it by the surface normal against one light, quantise to ten levels, and ten levels is
+all a character ramp can say anyway. The mismatch that usually makes ASCII rendering look
+cheap — the enormous loss between what was computed and what can be shown — stops mattering
+when the thing being computed was never a photograph.
+
+## subdivision
+
+A rectangle splits. Its halves split. Six levels down it stops, and what is left is a plan
+of a building nobody designed. Drawn as rules rather than fills, because the interesting
+part is the boundaries and not the rooms.
+
+It recomputes every six seconds and wipes in from the left. The wipe is the only part I
+added for effect and it is the part I am least sure about.
+
+## contours
+
+Fractal noise, then `fract(v * 7)`. The noise is not the image. The *banding* is the image
+— quantising a smooth field into a small ramp draws contour lines for free, and what you
+get is a topographic map of somewhere that does not exist and never did.
+
+## why bother
+
+Because a background that depicts something competes with the text in front of it. A
+background that is a process running does not. You can look at it or fail to notice it and
+neither is wrong, which is the whole specification, and it is the reason the default one —
+`drift` — is a slow fractal field with almost no contrast in which nothing whatsoever
+happens.
+
+[[background]] has the knobs. [[ascii]] has all fourteen of them running at once.

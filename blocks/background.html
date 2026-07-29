@@ -1,0 +1,125 @@
+title    the knobs
+date     2026-07-29
+tags     ascii textmode meta
+stage    budding
+js       bgconfig
+bg       drift
+bgopts   fps=12 fade=.8 drift=nav
+---
+<p>There is no preview pane on this page. The controls edit the actual background of the
+actual page, live — what you are looking at while you drag a slider <em>is</em> the thing
+you are configuring.</p>
+
+<form id="bg-form" class="bgform"></form>
+
+<noscript><p class="stage">This page is a control panel. Without javascript there is nothing
+to control.</p></noscript>
+
+<h2>where the settings live</h2>
+
+<p>Whatever you set here is saved in <code>localStorage</code> under
+<code>garden.bg</code> and applies to every page on this site until you clear it. It is
+yours, it never leaves your machine, and it beats whatever the page itself asked for. That
+ordering is deliberate: a reader who has decided the background should be
+<code>none</code> should not have that overruled by an essay.</p>
+
+<p class="stage">A page with no <code>bg</code> of its own ships four lines that look for
+your choice and fetch the engine only if it is there. The preference is honoured
+everywhere, and a reader who never set one still gets a page with no javascript on it.</p>
+
+<h2>five slots, and pictures</h2>
+
+<p>A slot is a name, a set of dials, and sometimes a picture. There are five. The dials sit
+in <code>localStorage</code> beside the live config; the pictures sit in IndexedDB, because
+one photograph as a data URI is most of what <code>localStorage</code> is allowed to hold.</p>
+
+<p>Neither ever leaves your machine, and that is the point rather than a limitation. It is
+also the one seam in the sharing: a link can carry dials, so <code>?bg=plasma&amp;bgopts=…</code>
+is a background you can send to someone. A picture cannot travel, so a link to
+<code>ascii</code> with <code>img=2</code> draws whatever is in <em>your</em> slot two —
+which is either a happy accident or nothing at all.</p>
+
+<pre class="verse">image   the picture, as a picture. a CSS layer, not a grid.
+ascii   the picture, redrawn out of the charset.
+mask    the picture as a stencil. text and motion, only inside it.</pre>
+
+<p><code>ascii</code> works because a ramp ordered dark to light <em>is</em> a greyscale
+palette with about ten steps, and a photograph quantised to ten steps is still recognisably
+the photograph. <code>mask</code> is the one that looks least like its inputs: the picture
+does no drawing at all, it only decides where drawing is allowed, so a face and the word
+<code>rot</code> produce neither a face nor the word.</p>
+
+<h2>what other people left</h2>
+
+<p>The gallery is a list of backgrounds other people have shared, and a button that adds
+yours. It carries dials only — a program name, a charset, one line of <code>k=v</code>. The
+server rebuilds every submission field by field against a whitelist rather than filtering
+it: a filter has to imagine every attack, a whitelist only has to name the ten things that
+are allowed. Nothing submitted is executed, nothing submitted is a path, and no picture is
+accepted at all.</p>
+
+<pre class="verse">block header   &lt;  localStorage  &lt;  query string
+    lowest                            highest</pre>
+
+<p>The query string wins so a particular field can be sent to someone:
+<code>/?bg=plasma&amp;bgopts=speed%3D2%20fade%3D.8</code> is a link to a specific
+background, not to a page that happens to have one.</p>
+
+<h2>putting it in a block</h2>
+
+<p>Three header fields, not ten — a block gets thirty-two fields in total and they are
+shared with <code>title</code>, <code>date</code>, <code>tags</code> and everything else, so
+the dials go on one line the way <code>css</code> holds one line of CSS.</p>
+
+<pre class="verse" id="bg-header">bg      drift</pre>
+
+<p class="stage">The button above copies the current settings in that form.
+<code>bg&nbsp;&nbsp;none</code> in a header switches the field off for one page while leaving
+your own preference alone everywhere else.</p>
+
+<h2>the dials</h2>
+
+<table style="border-collapse:collapse;font-family:var(--mono);font-size:.78rem;line-height:1.7">
+  <tr><th style="text-align:left;padding-right:1.5rem">key</th><th style="text-align:left">what</th></tr>
+  <tr><td>fps</td>        <td>frame cap. the field is a background; 12 is usually plenty</td></tr>
+  <tr><td>speed</td>      <td>multiplies time. 0 freezes it into a texture</td></tr>
+  <tr><td>scale</td>      <td>multiplies the program's own idea of size</td></tr>
+  <tr><td>size</td>       <td>cell size in px. smaller is more cells and more work</td></tr>
+  <tr><td>fade</td>       <td>opacity of the field. contrast against the prose</td></tr>
+  <tr><td>seed</td>       <td>names the random field. same seed, same noise, every reload</td></tr>
+  <tr><td>word</td>       <td>what <code>warp</code> dissolves. three letters works best</td></tr>
+  <tr><td>drift</td>      <td>which links float: nav, body, all, none</td></tr>
+  <tr><td>driftspeed</td> <td>how fast they float. 0 pins them</td></tr>
+  <tr><td>rd</td>         <td>which corner of the feed/kill plane <code>rd</code> runs in</td></tr>
+</table>
+
+<p class="stage">Cell size is the one that costs. Ten pixels on a large display is roughly
+twenty thousand cells; six pixels is fifty thousand, and the arithmetic per cell has not
+changed but there are two and a half times as many of them.</p>
+
+<h2>the two layers</h2>
+
+<p>The field and the floating links are separate <code>&lt;pre&gt;</code> elements, and that
+is not tidiness. A grid with no styles and no links on it is written to the DOM as one
+string and one <code>textContent</code> assignment for the entire screen. Put a single
+coloured link in it and every row has to be built out of <code>&lt;span&gt;</code>s
+instead. Keeping the links on their own layer — where nearly every row is empty, unchanged,
+and skipped — is what lets the field stay on the fast path.</p>
+
+<p class="stage">Nothing runs off-screen, nothing runs in a hidden tab, and under
+<code>prefers-reduced-motion</code> the field is drawn exactly once and then left alone.
+See <a href="/b/textmode">the writeup</a> and <a href="/b/ascii">the playground</a>.</p>
+
+<h2>the picture dials</h2>
+
+<table style="border-collapse:collapse;font-family:var(--mono);font-size:.78rem;line-height:1.7">
+  <tr><th style="text-align:left;padding-right:1.5rem">key</th><th style="text-align:left">what</th></tr>
+  <tr><td>img</td>        <td>which slot's picture, 1 to 5</td></tr>
+  <tr><td>fit</td>        <td>cover, contain or tile. only <code>image</code> reads it</td></tr>
+  <tr><td>gain</td>       <td>contrast around the midpoint, for <code>ascii</code>. flat photographs need it</td></tr>
+  <tr><td>maskthr</td>    <td>how bright a cell must be before <code>mask</code> draws in it</td></tr>
+  <tr><td>masktext</td>   <td>the word poured into the stencil. one token — <code>bgopts</code> is space separated. blank for a moving field</td></tr>
+  <tr><td>maskspeed</td>  <td>how fast the text crawls through it. 0 holds it still</td></tr>
+  <tr><td>maskinv</td>    <td>stencil the dark parts instead of the light</td></tr>
+  <tr><td>masksoft</td>   <td>let the picture's brightness fade the field, not just clip it</td></tr>
+</table>
