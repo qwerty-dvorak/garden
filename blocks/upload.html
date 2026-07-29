@@ -4,44 +4,39 @@ tags     ascii textmode meta
 stage    budding
 js       upload
 ---
-<p>Three of the backgrounds read a picture instead of a formula. <code>image</code> shows it,
-<code>ascii</code> redraws it out of the charset, and <code>mask</code> uses it as a stencil
-that text and motion are only allowed to appear inside. All three take the picture from a
-slot, and there are five slots.</p>
+<p>Three of the backgrounds read a picture instead of a formula. <code>image</code> shows
+it, <code>ascii</code> redraws it out of the charset, and <code>mask</code> uses it as a
+stencil that text is only allowed to appear inside.</p>
 
-<p><b>Nothing here is uploaded.</b> The word is wrong and kept only because it is the word
-people look for. A picture you choose is decoded in this tab and written to IndexedDB on
-your own machine; no request carries it anywhere, and the server has no route that would
-accept one if it tried.</p>
+<p>Pick a picture, then press one of the three. Each opens it on
+<a href="/b/demo">a page with nothing else on it</a>, because a background shown behind an
+essay is a background you cannot see.</p>
 
 <div id="upload" class="bgform"></div>
 
-<noscript><p class="stage">This page is a file picker and a store. Without javascript there
-is neither.</p></noscript>
+<noscript><p class="stage">This page is a file picker and three links. Without javascript
+there is neither.</p></noscript>
 
-<h2>the ones that ship</h2>
+<p class="stage"><b>Nothing here is uploaded.</b> The word is wrong and kept only because it
+is the word people look for. A picture you choose is decoded in this tab and written to
+IndexedDB on your own machine; no request carries it anywhere, and the server has no route
+that would accept one. That is also why a link you send someone carries the dials but not
+the picture — <a href="/b/demo">a shared <code>ascii</code></a> draws against whatever the
+person opening it has.</p>
 
-<p>Two pictures are offered as one-click samples, so there is something to point the
-programs at without going and finding a file. Both are drawn for the job:</p>
+<h2>the two that ship</h2>
 
-<pre class="verse">sphere   one shape, and every tone between black and white
-         inside it. what `ascii` wants.
-tree     one hard-edged silhouette. what `mask` wants — an
-         outline still legible when it is twenty rows tall.</pre>
+<p><b>sphere</b> is one shape with every tone between black and white inside it, which is
+what <code>ascii</code> wants — a subject that uses the whole ramp. <b>tree</b> is one
+hard-edged silhouette, which is what <code>mask</code> wants — an outline still legible
+when it is twenty rows tall.</p>
 
-<p>The other two are borrowed from elsewhere on the site, and they are here as the
-counter-example. <a href="/media/life.png">life</a> is a frame of Conway's life;
-<a href="/media/phyllotaxis.svg">phyllotaxis</a> is a vector spiral. Both look like
-something at full size and come out as almost nothing at twenty rows — sparse dots average
-to grey, and thin lines disappear between the cells. That is the whole constraint these
-programs have and it is worth seeing fail: <b>a picture here needs large shapes and a tonal
-range, not fine detail.</b></p>
-
-<p class="stage">Those two are linked to look at, not offered as buttons: a one-click sample
-that renders nothing is a trap, and they are the reason this page says any of this. A slot
-with nothing in it falls back to the sphere rather than to nothing, which is why
-<a href="/b/ascii">the playground</a> shows the picture programs doing something instead of
-two blank rectangles. Put your own picture in a slot and that stops.</p>
+<p class="stage">Both are drawn for the job. Two pictures already on the site were tried
+first and neither worked: <a href="/media/life.png">life</a> is sparse dots that average to
+near-black at twenty rows, and <a href="/media/phyllotaxis.svg">phyllotaxis</a> is thin
+lines that vanish between the cells. Not one cell of either cleared the stencil threshold.
+<b>A picture here needs large shapes and a tonal range, not fine detail</b> — which is worth
+knowing before you go looking for one of your own.</p>
 
 <h2>what to expect</h2>
 
@@ -51,6 +46,6 @@ mask    wants a subject. it draws only where the picture is
         bright, so a dark photograph masks almost everything
         away. invert it, or drop the threshold.</pre>
 
-<p><a href="/b/background">The knobs</a> are on their own page: which slot, how hard to read
-it, what text to pour into the stencil. <a href="/b/ascii">The playground</a> shows every
+<p>Five slots, the rest of the dials, and the gallery are on
+<a href="/b/background">the knobs page</a>. <a href="/b/ascii">The playground</a> runs every
 program at once and is the fastest way to see whether a picture is worth keeping.</p>

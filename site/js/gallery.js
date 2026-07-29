@@ -52,6 +52,15 @@
      * came to look broken here rather than merely unconfigured. */
     if (window.BgSlots && (name === 'ascii' || name === 'mask')) {
       window.BgSlots.preload({ bg: name, opts: {} });
+
+      /* These two are the only programs whose output depends on something
+       * the reader supplies, so they are the only ones whose caption has
+       * anywhere to send them. */
+      var pics = document.createElement('a');
+      pics.href = '/b/upload';
+      pics.className = 'pics';
+      pics.textContent = 'your picture →';
+      cap.appendChild(pics);
     }
   });
 

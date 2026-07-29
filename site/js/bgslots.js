@@ -451,6 +451,73 @@
     return parts.join(' ');
   }
 
+  /* ---------- one background, one url -----------------------------------
+   *
+   * Everything that shares a background — the permalink, the gallery, the
+   * demo page — goes through here, so a background is the same string
+   * wherever it turns up and there is exactly one place that decides what
+   * that string looks like.
+   */
+  function toQuery(cfg) {
+    var q = 'bg=' + encodeURIComponent(cfg.bg || 'none');
+    var line = optsLine(cfg);
+    if (cfg.chars) q += '&bgchars=' + encodeURIComponent(cfg.chars);
+    if (line) q += '&bgopts=' + encodeURIComponent(line);
+    return q;
+  }
+
+  /* Where a background goes to be looked at. A page with almost nothing on
+   * it, so the background is the thing you are looking at rather than
+   * something happening behind an essay. */
+  function demoUrl(cfg) { return '/b/demo?' + toQuery(cfg); }
+
+  function permalink(cfg) { return location.origin + '/?' + toQuery(cfg); }
+
+  /* Read a background out of a query string. The inverse of toQuery, and the
+   * reason the demo page needs no state of its own. */
+  function fromQuery(search) {
+    var q = new URLSearchParams(search || location.search);
+    var opts = {};
+    (q.get('bgopts') || '').split(/[\s;]+/).forEach(function (pair) {
+      var i = pair.indexOf('=');
+      if (i > 0) opts[pair.slice(0, i).toLowerCase()] = pair.slice(i + 1);
+    });
+    return { bg: q.get('bg') || '', chars: q.get('bgchars') || '', opts: opts };
+  }
+
+  /* Copy, on a site served over plain http.
+   *
+   * navigator.clipboard does not exist outside a secure context, so the
+   * button that used it did nothing at all here and gave no sign of it.
+   * execCommand is deprecated and works; when even that fails the text is
+   * selected, which is the honest fallback — the reader can press the key
+   * themselves, and can see that is what is being asked of them.
+   */
+  function copyText(text, node, cb) {
+    function done(ok) { if (cb) cb(ok); }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); },
+                                               function () { select(); });
+      return;
+    }
+    select();
+
+    function select() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      if (!ok && node && node.select) { node.focus(); node.select(); }
+      done(ok);
+    }
+  }
+
   function share(name, cfg, cb) {
     var body = 'name=' + encodeURIComponent(name || 'untitled') +
                '&bg=' + encodeURIComponent(cfg.bg || 'none') +
@@ -520,22 +587,34 @@
           var what = document.createElement('code');
           what.textContent = e.bg + (e.opts ? '  ' + e.opts : '');
 
+          var opts = {};
+          (e.opts || '').split(/\s+/).forEach(function (pair) {
+            var i = pair.indexOf('=');
+            if (i > 0) opts[pair.slice(0, i)] = pair.slice(i + 1);
+          });
+          var cfg = { bg: e.bg, chars: e.chars || '', opts: opts };
+
+          /* Opening somebody else's background on the page you are already
+           * reading is how it was, and it did not work: the background is
+           * behind an essay, so the thing you asked to see is the thing you
+           * cannot see. It gets a page of its own instead. */
+          var see = document.createElement('a');
+          see.className = 'btn';
+          see.href = demoUrl(cfg);
+          see.textContent = 'see it';
+
           var use = document.createElement('button');
           use.type = 'button';
-          use.textContent = 'load';
+          use.textContent = 'use';
+          use.title = 'make this the background of every page here';
           use.addEventListener('click', function () {
-            var opts = {};
-            (e.opts || '').split(/\s+/).forEach(function (pair) {
-              var i = pair.indexOf('=');
-              if (i > 0) opts[pair.slice(0, i)] = pair.slice(i + 1);
-            });
-            var cfg = { bg: e.bg, chars: e.chars || '', opts: opts };
             if (window.Backdrop) window.Backdrop.save(cfg);
             if (onLoad) onLoad(cfg);
           });
 
           line.appendChild(who);
           line.appendChild(what);
+          line.appendChild(see);
           line.appendChild(use);
 
           /* Only what this browser posted can be withdrawn, and only this
@@ -625,6 +704,20 @@
     galleryUI: galleryUI,
     share: share,
     unshare: unshare,
-    optsLine: optsLine
+    optsLine: optsLine,
+    toQuery: toQuery,
+    fromQuery: fromQuery,
+    demoUrl: demoUrl,
+    permalink: permalink,
+    copyText: copyText,
+
+    /* The block-header form of a background, for pasting into a .note. */
+    headerLines: function (cfg) {
+      var lines = ['bg      ' + (cfg.bg || 'none')];
+      var line = optsLine(cfg);
+      if (cfg.chars) lines.push('bgchars ' + cfg.chars);
+      if (line) lines.push('bgopts  ' + line);
+      return lines.join('\n');
+    }
   };
 })();

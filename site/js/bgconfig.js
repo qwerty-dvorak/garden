@@ -335,9 +335,25 @@
     galleryWrap.className = 'full gallery';
 
     /* The list itself is built by bgslots, so this page and /b/ascii cannot
-     * drift apart. Loading one here reloads, because the whole panel is
-     * built from the config it just replaced. */
-    var showGallery = S.galleryUI(galleryWrap, function () { location.reload(); });
+     * drift apart. `see it` is a link to the demo page; `use` lands here,
+     * and updates the controls in place rather than reloading — the panel is
+     * long, and throwing somebody back to the top of it to change one thing
+     * is a tax on the feature working. */
+    var showGallery = S.galleryUI(galleryWrap, function (loaded) {
+      cfg.bg = loaded.bg; cfg.chars = loaded.chars || '';
+      for (var k in o) delete o[k];
+      for (var k2 in loaded.opts) o[k2] = loaded.opts[k2];
+      sel.value = (cfg.bg === 'image' || (cfg.bg && T.programs[cfg.bg])) ? cfg.bg : 'none';
+      chars.value = cfg.chars;
+      link.value = permalink();
+      if (pre && S) pre.textContent = S.headerLines(cfg);
+      status.textContent = 'using it. the dials above are its dials now.';
+    });
+
+    /* The list first, then the thing you do to add to it. Naming a
+     * background before you have seen what other people called theirs is
+     * asking for the label before the context. */
+    row('shared', galleryWrap);
 
     var shareRow = document.createElement('div');
     shareRow.className = 'full row';
@@ -347,41 +363,35 @@
     shareName.placeholder = 'call it something';
     shareName.setAttribute('spellcheck', 'false');
 
+    var shareStatus = document.createElement('span');
+    shareStatus.className = 'stage';
+
     var shareBtn = document.createElement('button');
     shareBtn.type = 'button';
-    shareBtn.textContent = 'share this background';
+    shareBtn.textContent = 'add yours';
     shareBtn.addEventListener('click', function () {
+      shareBtn.disabled = true;
       S.share(shareName.value, cfg, function (ok, data, status) {
+        shareBtn.disabled = false;
         shareStatus.textContent = ok
-          ? 'shared.'
+          ? 'shared. it is yours to delete.'
           : status === 429 ? 'too many just now — wait a minute.'
           : status === 400 ? 'the server would not take that one.'
           : 'could not share.';
-        if (ok) showGallery();
+        if (ok) { shareName.value = ''; showGallery(); }
       });
     });
-
-    var shareStatus = document.createElement('span');
-    shareStatus.className = 'stage';
 
     shareRow.appendChild(shareName);
     shareRow.appendChild(shareBtn);
     shareRow.appendChild(shareStatus);
-
-    row('shared', galleryWrap);
-    form.appendChild(shareRow);
-    showGallery();
+    row('add yours', shareRow);
   }
 
   /* --- permalink and reset ------------------------------------------------ */
-  function permalink() {
-    var parts = [];
-    for (var k in o) if (o[k] !== '' && o[k] !== undefined) parts.push(k + '=' + o[k]);
-    var q = '?bg=' + encodeURIComponent(cfg.bg || 'none');
-    if (cfg.chars) q += '&bgchars=' + encodeURIComponent(cfg.chars);
-    if (parts.length) q += '&bgopts=' + encodeURIComponent(parts.join(' '));
-    return location.origin + '/' + q;
-  }
+  /* One place decides what a shared background looks like as a string, and
+   * it is not this file — the gallery and the demo page have to agree. */
+  function permalink() { return S ? S.permalink(cfg) : location.origin + '/'; }
 
   var link = document.createElement('input');
   link.type = 'text';
@@ -392,34 +402,55 @@
 
   var buttons = document.createElement('div');
   buttons.className = 'full row';
+  var status = document.createElement('p');
+  status.className = 'stage full';
+
   var reset = document.createElement('button');
   reset.type = 'button';
   reset.textContent = 'forget my settings';
   reset.addEventListener('click', function () {
+    /* Reloading threw the reader back to the top of a long page to undo one
+     * setting. reset() already rebuilds the backdrop; the controls just have
+     * to be told what the config is now. */
     B.reset();
-    location.reload();
+    var fresh = B.config();
+    cfg.bg = fresh.bg; cfg.chars = fresh.chars;
+    for (var k in o) delete o[k];
+    for (var k2 in fresh.opts) o[k2] = fresh.opts[k2];
+    sel.value = (cfg.bg === 'image' || (cfg.bg && T.programs[cfg.bg])) ? cfg.bg : 'none';
+    chars.value = cfg.chars || '';
+    link.value = permalink();
+    if (pre) pre.textContent = S ? S.headerLines(cfg) : '';
+    status.textContent = 'forgotten. the page is back to whatever each block asks for.';
   });
+
   var header = document.createElement('button');
   header.type = 'button';
   header.textContent = 'copy as block header';
   header.addEventListener('click', function () {
-    var parts = [];
-    for (var k in o) if (o[k] !== '' && o[k] !== undefined) parts.push(k + '=' + o[k]);
-    var lines = ['bg      ' + (cfg.bg || 'none')];
-    if (cfg.chars) lines.push('bgchars ' + cfg.chars);
-    if (parts.length) lines.push('bgopts  ' + parts.join(' '));
-    var out = lines.join('\n');
-    if (navigator.clipboard) navigator.clipboard.writeText(out);
-    var pre = document.getElementById('bg-header');
+    var out = S ? S.headerLines(cfg) : '';
     if (pre) pre.textContent = out;
+    /* This site is served over plain http, where navigator.clipboard does
+     * not exist. The old code asked for it, found nothing, and silently did
+     * nothing — the button looked broken because it was. */
+    if (S) S.copyText(out, null, function (ok) {
+      status.textContent = ok
+        ? 'copied. paste it above the --- in a block.'
+        : 'copy is not available here — the header is shown below, select it.';
+    });
   });
+
+  var pre = document.getElementById('bg-header');
+
   buttons.appendChild(header);
   buttons.appendChild(reset);
   form.appendChild(buttons);
+  form.appendChild(status);
 
   form.addEventListener('submit', function (e) { e.preventDefault(); });
 
-  /* show the header form for the current settings straight away */
-  var pre = document.getElementById('bg-header');
-  if (pre) header.click();
+  /* Show the header for the current settings straight away — by writing it,
+   * not by clicking the button, which would now reach for the clipboard on
+   * page load and announce a copy nobody asked for. */
+  if (pre && S) pre.textContent = S.headerLines(cfg);
 })();
