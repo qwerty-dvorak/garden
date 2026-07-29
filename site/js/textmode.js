@@ -260,6 +260,16 @@
     this.bst = new Uint8Array(grid.n);
     /* -1 is not a valid glyph index, so the first frame is entirely dirty */
     this.bch.fill(65535);
+    /* The link markers get a back buffer for the same reason the glyphs do.
+     * Without one the scan below cannot tell an unchanged link from a new
+     * one, so it assumed the worst and rewrote the row every frame — which
+     * meant a fresh <a> every frame, and an element that does not survive
+     * from mousedown to mouseup is an element the browser never reports a
+     * click on. Dense arrays rather than sparse objects: allocated once
+     * here, assigned in place after, so the frame loop still allocates
+     * nothing. */
+    this.blo = new Array(grid.n);
+    this.blc = new Array(grid.n);
     this.rowstr = new Array(grid.rows);
     this.cols = grid.cols; this.rows = grid.rows;
     this.el.textContent = '';
@@ -273,6 +283,8 @@
     if (mono !== this.mono) {
       this.mono = mono;
       this.bch.fill(65535);
+      this.blo.fill(undefined);
+      this.blc.fill(undefined);
       this.el.textContent = '';
       if (!mono) {
         for (var r = 0; r < this.rows; r++) {
@@ -315,6 +327,7 @@
     var cols = this.cols, rows = this.rows;
     var ch = grid.ch, st = grid.st, bch = this.bch, bst = this.bst;
     var h = grid.cs.h, styles = grid.styles, lo = grid.lo, lc = grid.lc;
+    var blo = this.blo, blc = this.blc;
     var nodes = this.el.childNodes, dirty = 0;
 
     for (var j = 0; j < rows; j++) {
@@ -323,8 +336,13 @@
       for (i = 0; i < cols; i++) {
         idx = offs + i;
         if (ch[idx] !== bch[idx] || st[idx] !== bst[idx]) { changed = true; break; }
-        /* a link can appear or vanish without either array moving */
-        if (lo && (lo[idx] || lc[idx])) { changed = true; break; }
+        /* A link can appear, move or vanish without either glyph array
+         * moving, so the markers are compared against their own back buffer
+         * rather than merely noticed. Noticing them was enough to know the
+         * row *might* have changed, and rewriting on a maybe is what
+         * destroyed the anchor every frame. */
+        if ((lo ? lo[idx] : undefined) !== blo[idx] ||
+            (lc ? lc[idx] : undefined) !== blc[idx]) { changed = true; break; }
       }
       if (!changed) continue;
       dirty++;
@@ -333,6 +351,8 @@
       for (i = 0; i < cols; i++) {
         idx = offs + i;
         bch[idx] = ch[idx]; bst[idx] = st[idx];
+        blo[idx] = lo ? lo[idx] : undefined;
+        blc[idx] = lc ? lc[idx] : undefined;
 
         if (lo && lo[idx] !== undefined) {
           if (open) { html += '</span>'; open = false; cur = -1; }

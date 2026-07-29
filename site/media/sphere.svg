@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <title>a lit sphere</title>
+  <desc>A test picture for the character programs: one shape, and every tone
+  between black and white inside it. `ascii` needs a subject that uses the
+  whole ramp; a photograph that lives in the middle turns to mud.</desc>
+  <defs>
+    <radialGradient id="lit" cx="36%" cy="30%" r="78%">
+      <stop offset="0%"   stop-color="#ffffff"/>
+      <stop offset="22%"  stop-color="#e2e2e2"/>
+      <stop offset="48%"  stop-color="#9a9a9a"/>
+      <stop offset="72%"  stop-color="#4e4e4e"/>
+      <stop offset="92%"  stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#0d0d0d"/>
+    </radialGradient>
+    <radialGradient id="bounce" cx="50%" cy="88%" r="60%">
+      <stop offset="0%"   stop-color="#6a6a6a" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="360" fill="#000000"/>
+  <ellipse cx="320" cy="330" rx="190" ry="26" fill="url(#bounce)"/>
+  <circle cx="320" cy="176" r="150" fill="url(#lit)"/>
+</svg>

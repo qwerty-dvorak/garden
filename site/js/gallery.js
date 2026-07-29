@@ -44,6 +44,15 @@
 
     var h = T.run(pre, p, {});
     running.push({ h: h, ms: ms, name: name });
+
+    /* The picture programs read a decoded image out of BgSlots, and nothing
+     * on this page would otherwise ask for one — panels are run directly
+     * rather than through Backdrop.build(), which is what normally triggers
+     * the decode. Without this they draw an empty grid, which is how they
+     * came to look broken here rather than merely unconfigured. */
+    if (window.BgSlots && (name === 'ascii' || name === 'mask')) {
+      window.BgSlots.preload({ bg: name, opts: {} });
+    }
   });
 
   /* One timer for all of them rather than one each: the numbers are a debug

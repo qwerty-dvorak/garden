@@ -19,18 +19,29 @@ accept one if it tried.</p>
 <noscript><p class="stage">This page is a file picker and a store. Without javascript there
 is neither.</p></noscript>
 
-<h2>the two that ship</h2>
+<h2>the ones that ship</h2>
 
-<p>Two pictures already in the site are offered as samples, so there is something to point
-the programs at without going and finding a file. <a href="/media/life.png">life</a> is a
-frame of Conway's life — high contrast, mostly empty, which is what makes it a good
-stencil. <a href="/media/phyllotaxis.svg">phyllotaxis</a> is a vector spiral, so it is all
-gentle gradient and no hard edge, which is the opposite problem and useful for exactly that
-reason.</p>
+<p>Two pictures are offered as one-click samples, so there is something to point the
+programs at without going and finding a file. Both are drawn for the job:</p>
 
-<p class="stage">A slot with nothing in it falls back to the first of those rather than to
-nothing, which is why <a href="/b/ascii">the playground</a> shows the picture programs doing
-something instead of two blank rectangles. Put your own picture in a slot and that stops.</p>
+<pre class="verse">sphere   one shape, and every tone between black and white
+         inside it. what `ascii` wants.
+tree     one hard-edged silhouette. what `mask` wants — an
+         outline still legible when it is twenty rows tall.</pre>
+
+<p>The other two are borrowed from elsewhere on the site, and they are here as the
+counter-example. <a href="/media/life.png">life</a> is a frame of Conway's life;
+<a href="/media/phyllotaxis.svg">phyllotaxis</a> is a vector spiral. Both look like
+something at full size and come out as almost nothing at twenty rows — sparse dots average
+to grey, and thin lines disappear between the cells. That is the whole constraint these
+programs have and it is worth seeing fail: <b>a picture here needs large shapes and a tonal
+range, not fine detail.</b></p>
+
+<p class="stage">Those two are linked to look at, not offered as buttons: a one-click sample
+that renders nothing is a trap, and they are the reason this page says any of this. A slot
+with nothing in it falls back to the sphere rather than to nothing, which is why
+<a href="/b/ascii">the playground</a> shows the picture programs doing something instead of
+two blank rectangles. Put your own picture in a slot and that stops.</p>
 
 <h2>what to expect</h2>
 

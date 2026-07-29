@@ -727,15 +727,21 @@ static void handle(int fd)
 
     if (!strcmp(path, "/fonts.css")) { serve_fonts_css(fd); return; }
 
-    /* mounted folders: the only paths allowed to leave site/ */
-    if (!strncmp(path, "/mnt/", 5)) {
-        if (serve_mount(fd, path)) return;
-        not_found(fd, path);
-        return;
-    }
+    /* mounted folders: the only paths allowed to leave site/
+     *
+     * The index goes first. "/mnt/" matches the prefix below with an empty
+     * name, which serve_mount rejects, so with the branches the other way
+     * round the trailing slash was a 404 and the `|| "/mnt/"` here could
+     * never be reached — a directory whose own listing depended on being
+     * asked for without the slash a directory usually has. */
     if (!strcmp(path, "/mnt") || !strcmp(path, "/mnt/")) {
         push_listing(SITE_DIR "/mnt", "", "");
         respond_lua(fd, "200 OK", "mounts");
+        return;
+    }
+    if (!strncmp(path, "/mnt/", 5)) {
+        if (serve_mount(fd, path)) return;
+        not_found(fd, path);
         return;
     }
 

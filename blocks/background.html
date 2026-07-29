@@ -120,6 +120,19 @@ and skipped — is what lets the field stay on the fast path.</p>
 <code>prefers-reduced-motion</code> the field is drawn exactly once and then left alone.
 See <a href="/b/textmode">the writeup</a> and <a href="/b/ascii">the playground</a>.</p>
 
+<h2>the floating links are links</h2>
+
+<p>They drift, and they go where they say. Reach for one and the whole layer stops moving
+until you leave it, because a word that slides out from under the pointer between deciding
+to click it and clicking it is not a link, it is a joke about one.</p>
+
+<p class="stage">They navigate on <code>pointerdown</code> rather than on click, and that is
+not a preference. A click is not something the browser sends; it is an inference from a
+mousedown and a mouseup landing on the same element. This layer rewrites the row a word
+lives on as the word moves, so by mouseup the anchor is a different element and the
+inference never gets made. The links were real anchors the whole time and lit up on hover —
+they simply could not be clicked.</p>
+
 <h2>the picture dials</h2>
 
 <table style="border-collapse:collapse;font-family:var(--mono);font-size:.78rem;line-height:1.7">

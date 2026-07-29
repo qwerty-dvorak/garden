@@ -67,6 +67,18 @@ sudo systemctl daemon-reload
 sudo systemctl enable garden garden-hook
 sudo systemctl restart garden garden-hook
 
+say "mount"
+# The site serves its own source. /mnt is the one place allowed to leave
+# site/, and pointing it at the checkout means the code behind every page is
+# readable from the page — which is the only version of "open source" that
+# does not require the reader to go somewhere else.
+#
+# site/mnt/* is gitignored, so the link survives the hard reset a deploy does
+# and never ends up committed.
+mkdir -p "$REPO_DIR/site/mnt"
+ln -sfn "$REPO_DIR" "$REPO_DIR/site/mnt/garden"
+echo "  /mnt/garden -> $REPO_DIR"
+
 say "nginx"
 render "$REPO_DIR/deploy/nginx-garden.conf" | sudo tee /etc/nginx/sites-available/garden > /dev/null
 sudo ln -sfn /etc/nginx/sites-available/garden /etc/nginx/sites-enabled/garden

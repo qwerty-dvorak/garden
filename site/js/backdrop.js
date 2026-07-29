@@ -107,6 +107,11 @@
     return out;
   }
 
+  /* True while the pointer is over one of the drifting links. Module level
+   * because the program that draws them and the handlers that watch for the
+   * pointer are on opposite sides of the runner. */
+  var reaching = false;
+
   /* One floater per link. Position in cells, velocity in cells per frame.
    *
    * `flap` is ertdfgcvb's split-flap: a character does not appear, it counts
@@ -141,7 +146,10 @@
         var cols = g.cols, rows = g.rows, cs = g.cs, lit = this.lit;
         /* Half rate, like the original's `frame % 2` overlay. Nobody reads a
          * word that is drifting at a fortieth of a cell per frame. */
-        var advance = (ctx.frame & 1) === 0;
+        /* Hold still while somebody is reaching for a link. A word that
+         * moves out from under the pointer between deciding to click it and
+         * clicking it is not a link, it is a joke about one. */
+        var advance = (ctx.frame & 1) === 0 && !reaching;
 
         for (var n = 0; n < this.f.length; n++) {
           var f = this.f[n];
@@ -195,6 +203,50 @@
 
   /* ---------- assembly -------------------------------------------------- */
 
+  /* Make the drifting words behave like the links they are.
+   *
+   * They already were anchors, and the layer already sat above the page, so
+   * hovering one lit up — but clicking did nothing, and the reason is that a
+   * click is not an event the browser sends. It is an inference from a
+   * mousedown and a mouseup landing on the same element, and this layer
+   * rewrites the row a word lives on as the word moves. By mouseup the
+   * anchor is a different element, so the inference never gets made.
+   *
+   * So: freeze while the pointer is on one, and navigate on pointerdown,
+   * which is a real event about a real element and needs nothing to survive
+   * until the button comes back up. Delegated, because the anchors are
+   * replaced constantly and listeners on them would go with them. */
+  function wire(layer) {
+    function anchor(e) {
+      /* the glyphs are spans inside the anchor on the styled path */
+      var a = e.target && e.target.closest && e.target.closest('a');
+      return a && layer.contains(a) ? a : null;
+    }
+
+    layer.addEventListener('pointerover', function (e) {
+      if (anchor(e)) reaching = true;
+    });
+    layer.addEventListener('pointerout', function (e) {
+      var a = anchor(e);
+      /* pointerout also fires moving from the anchor onto a span inside it,
+       * and on the styled path the glyphs are exactly that. Without this the
+       * word unfreezes while the pointer is still sitting on it. */
+      if (a && !(e.relatedTarget && a.contains(e.relatedTarget))) reaching = false;
+    });
+    layer.addEventListener('pointerdown', function (e) {
+      /* Only the plain primary press. Middle click, ctrl or cmd click and
+       * the context menu all belong to the anchor, which carries the href
+       * and knows what those mean; taking them here would break opening a
+       * link in a new tab in order to fix opening it in this one. */
+      if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      var a = anchor(e);
+      var href = a && a.getAttribute('href');
+      if (!href) return;
+      e.preventDefault();
+      window.location.href = href;
+    });
+  }
+
   var running = { field: null, drift: null, els: [] };
 
   function teardown() {
@@ -202,6 +254,10 @@
     if (running.drift) running.drift.stop();
     running.els.forEach(function (e) { if (e.parentNode) e.parentNode.removeChild(e); });
     running = { field: null, drift: null, els: [] };
+    /* A rebuild while the pointer was on a word would otherwise leave the
+     * next layer frozen from birth, with nothing left to send the pointerout
+     * that would release it. */
+    reaching = false;
   }
 
   function build() {
@@ -257,6 +313,7 @@
       layer.className = 'bg-drift';
       layer.setAttribute('aria-hidden', 'true');
       if (o.size) layer.style.fontSize = num(o.size, 10) + 'px';
+      wire(layer);
       document.body.insertBefore(layer, field.nextSibling);
       running.els.push(layer);
       running.drift = T.run(layer, driftProgram(items, o), { chars: c.chars || undefined });

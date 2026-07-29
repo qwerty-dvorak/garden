@@ -266,6 +266,7 @@ pre.ascii {
 /* the only clickable thing in either layer */
 .bg-drift a {
   pointer-events: auto;
+  cursor: pointer;
   color: var(--bg-lit);
   text-decoration: none;
 }

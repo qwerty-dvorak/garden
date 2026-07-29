@@ -1,0 +1,7 @@
+# The source is mounted at /mnt/garden, and the mount points at the checkout
+# that contains it — so /mnt/garden/site/mnt/garden/... resolves forever.
+# Depth is bounded by the path buffer, but the tree is combinatorially wide
+# and every level is a real directory listing. People can follow it; crawlers
+# should not.
+User-agent: *
+Disallow: /mnt/garden/site/mnt/

@@ -33,16 +33,27 @@
   var STORE = 'images';
   var MAX_BYTES = 8 * 1024 * 1024;
 
-  /* Pictures that already ship with the site. They are what the picture
-   * programs fall back to when a slot is empty, which is the difference
-   * between /b/ascii showing what `ascii` and `mask` do and showing two
-   * blank rectangles. Both are already in site/media for other blocks, so
-   * this costs no new bytes. */
+  /* Pictures to point the character programs at, and what an empty slot
+   * falls back to.
+   *
+   * Drawn for the job rather than borrowed from elsewhere on the site. The
+   * borrowed ones did not work: a frame of life is sparse dots that average
+   * to near-black at twenty rows, and the phyllotaxis is thin lines on
+   * white. Neither put a single cell above the mask threshold. These
+   * programs need large shapes and a tonal range, not fine detail.
+   *
+   *   sphere   every tone between black and white inside one shape. what
+   *            `ascii` wants: a subject that uses the whole ramp.
+   *   tree     one hard-edged silhouette. what `mask` wants: an outline
+   *            still recognisable when it is twenty rows tall.
+   */
   var SAMPLES = [
-    { url: '/media/life.png', name: 'life' },
-    { url: '/media/phyllotaxis.svg', name: 'phyllotaxis' }
+    { url: '/media/sphere.svg', name: 'sphere' },
+    { url: '/media/tree.svg', name: 'tree' }
   ];
-  var SAMPLE_URL = SAMPLES[0].url;
+  /* The fallback is named rather than taken from SAMPLES[0], so reordering
+   * the buttons cannot quietly change what an empty slot renders. */
+  var SAMPLE_URL = '/media/sphere.svg';
 
   /* ---------- slot metadata (localStorage) ------------------------------ */
 

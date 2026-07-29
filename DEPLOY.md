@@ -128,6 +128,17 @@ Logs: `/var/lib/garden/deploy.log`, and `journalctl -u garden-hook`.
     deploy/garden-hook.service   unit template
     deploy/nginx-garden.conf     vhost template
 
+`bootstrap.sh` also links `site/mnt/garden` to the checkout, so the site serves
+its own source at `/mnt/garden/`. `/mnt` is the one place allowed to leave
+`site/`, and `site/mnt/*` is gitignored — so the link survives the hard reset
+a deploy does and never ends up committed.
+
+Two things follow from that and are worth knowing rather than discovering:
+the checkout includes `.git`, so the full history is readable over http (fine
+for a public repo, not for a private one), and the link makes the tree
+recursive — `/mnt/garden/site/mnt/garden/…` resolves forever. Nothing follows
+it on its own, but a crawler would.
+
 State, none of it in the repo:
 
     /etc/garden/garden.conf      secret, ports, paths, hostnames
