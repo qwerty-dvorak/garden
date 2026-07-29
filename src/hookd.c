@@ -674,7 +674,13 @@ static void gallery_delete(int fd, const char *body)
          line = strtok_r(NULL, "\n", &save)) {
         char copy[LINE_MAX], *fl[FIELDS];
         snprintf(copy, sizeof copy, "%s", line);
-        if (split_entry(copy, fl) && !strcmp(fl[0], id)) {
+        /* A line that will not split is one nothing can ever read — an entry
+         * from an older field layout, or a truncated write. Dropping it on
+         * the next rewrite is what makes a format change self-healing;
+         * keeping it would hold a slot against the cap forever while being
+         * invisible to everyone. */
+        if (!split_entry(copy, fl)) continue;
+        if (!strcmp(fl[0], id)) {
             if (same(fl[2], want)) { found = 1; continue; }   /* dropped */
             denied = 1;
         }
@@ -820,7 +826,10 @@ static void gallery_post(int fd, const char *body, const char *ip)
         char *line, *save = NULL;
         for (line = strtok_r(old, "\n", &save); line;
              line = strtok_r(NULL, "\n", &save)) {
+            char copy[LINE_MAX], *fl[FIELDS];
             if (!strncmp(line, id, 12) && line[12] == '\t') continue;  /* replaced */
+            snprintf(copy, sizeof copy, "%s", line);
+            if (!split_entry(copy, fl)) continue;      /* unreadable, drop it */
             /* Newest first, so anything past the cap is the oldest there is
              * and simply stops being written. */
             if (kept >= GALLERY_MAX) break;
