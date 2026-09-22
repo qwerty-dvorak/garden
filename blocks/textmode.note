@@ -116,5 +116,5 @@ Everything pauses off-screen and on a hidden tab, and under `prefers-reduced-mot
 field is composed exactly once and then left alone. A still noise field is a texture. A
 moving one, behind text, is a hazard.
 
-See [[ascii]] for all of them running at once, [[background]] to change the one behind this
-page, and [[abstract]] for the half that are not pictures of anything.
+See [[background]] to change the one behind this page, and [[abstract]] for the half that
+are not pictures of anything.

@@ -75,8 +75,8 @@ get is a topographic map of somewhere that does not exist and never did.
 
 Because a background that depicts something competes with the text in front of it. A
 background that is a process running does not. You can look at it or fail to notice it and
-neither is wrong, which is the whole specification, and it is the reason the default one —
+neither is wrong, which is the whole specification, and it is the reason the quietest one —
 `drift` — is a slow fractal field with almost no contrast in which nothing whatsoever
 happens.
 
-[[background]] has the knobs. [[ascii]] has all fourteen of them running at once.
+[[background]] has the small set of knobs that remains.

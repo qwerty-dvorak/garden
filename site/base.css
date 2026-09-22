@@ -207,12 +207,8 @@ pre.ascii {
 }
 
 /* ---------- textmode: the field behind the page ----------
-   Two fixed <pre>s at z-index -1. body's own background propagates to the
-   canvas and is painted before them, so they sit between the paper and the
-   text without either needing a stacking context. Nothing here is content:
-   both layers are aria-hidden, both are inert to the pointer, and neither
-   exists at all until backdrop.js decides the page asked for one. */
-.bg-field, .bg-drift {
+   One inert, aria-hidden layer between the paper and the writing. */
+.bg-field {
   position: fixed;
   inset: 0;
   z-index: -1;
@@ -228,49 +224,7 @@ pre.ascii {
   letter-spacing: 0;
 }
 
-/* The drift layer holds real anchors, and an anchor at `z-index: -1` is a
-   picture of a link. Negative layers paint below in-flow content, and hit
-   testing follows painting: <body> covers the column, so every floating link
-   under the prose was unclickable — which was most of them.
-
-   So this one layer comes forward. It stays inert to the pointer, and only
-   the anchors inside it take clicks back, so nothing else about the page
-   changes. The trade is honest and worth naming: the words now pass in front
-   of the prose rather than behind it. They are drawn in `--bg-lit`, which is
-   a few percent off the paper, and the layer is nearly all empty rows. */
-.bg-drift { z-index: 1; }
-/* No opacity here on purpose. The colour already carries the subtlety, so
-   `fade` stays a plain multiplier the reader controls rather than something
-   stacked on top of a value they cannot see. */
 .bg-field { color: var(--bg-ink); }
-.bg-drift { color: var(--bg-lit); }
-
-/* A picture shown as a picture. The two character layers draw a background
-   out of glyphs; this one just is one, and putting it through the grid would
-   be an elaborate way of making it worse.
-
-   Same z-index and the same fixed box as the field, so a picture and a
-   program stack the way you would expect if you ever set both. Opacity is set
-   inline from `fade`, which is the same dial the field uses — one word for
-   one idea, whichever layer is carrying it. */
-.bg-image {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-}
-
-/* the only clickable thing in either layer */
-.bg-drift a {
-  pointer-events: auto;
-  cursor: pointer;
-  color: var(--bg-lit);
-  text-decoration: none;
-}
-.bg-drift a:hover { color: var(--ink); text-decoration: underline; }
 
 /* The field's two colours are mixed out of the page's own, not set
    independently — `ink` and `paper` are per-page knobs, and a block that sets
@@ -278,22 +232,13 @@ pre.ascii {
    The literals below are the fallback for browsers without color-mix; the
    mixed values win everywhere else, and because custom properties resolve at
    use time they pick up whatever `ink` and `paper` the header set. */
-:root { --bg-ink: #cfcabd; --bg-lit: #b3ad9e; }
-@media (prefers-color-scheme: dark) { :root { --bg-ink: #23231c; --bg-lit: #37362c; } }
+:root { --bg-ink: #cfcabd; }
+@media (prefers-color-scheme: dark) { :root { --bg-ink: #23231c; } }
 
 @supports (color: color-mix(in srgb, red, blue)) {
   :root {
     --bg-ink: color-mix(in srgb, var(--ink) 30%, var(--paper));
-    --bg-lit: color-mix(in srgb, var(--ink) 55%, var(--paper));
   }
-}
-
-/* a page that is mostly field wants its prose to sit on something */
-body.bg-panel article,
-body.bg-panel > h1 {
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
-  padding: .1rem 1rem;
-  border-radius: 2px;
 }
 
 /* ---------- textmode: pieces embedded in a page ---------- */
@@ -323,12 +268,7 @@ body.bg-panel > h1 {
   flex-wrap: wrap;
   align-items: baseline;
 }
-.tm figcaption b { font-weight: normal; color: var(--ink); }
-.tm figcaption .ms { margin-left: auto; font-variant-numeric: tabular-nums; }
-
-.gallery { display: grid; gap: var(--step); grid-template-columns: 1fr; }
-@media (min-width: 52rem) { .gallery { grid-template-columns: 1fr 1fr; } }
-.gallery .tm pre { height: 11rem; font-size: 7px; }
+.tm figcaption a { color: var(--ink); }
 
 /* ---------- the background configurator ---------- */
 .bgform {
@@ -341,6 +281,7 @@ body.bg-panel > h1 {
   margin: var(--step) 0;
 }
 .bgform label { color: var(--faint); }
+.bgform > * { min-width: 0; }
 .bgform select, .bgform input {
   font: inherit;
   width: 100%;
@@ -353,62 +294,11 @@ body.bg-panel > h1 {
 .bgform .row { display: flex; gap: .5rem; align-items: center; }
 .bgform output { color: var(--faint); min-width: 3rem; font-variant-numeric: tabular-nums; }
 .bgform .full { grid-column: 1 / -1; }
+@media (max-width: 28rem) {
+  .bgform { grid-template-columns: 1fr; }
+  .bgform .full { grid-column: 1; }
+}
 
-/* Five slots and the shared list. Both are rows of controls that have to
-   survive a name long enough to wrap, so they scroll rather than stretch the
-   grid column that holds them. */
-.bgform .slots, .bgform .gallery {
-  display: flex;
-  flex-direction: column;
-  gap: .35rem;
-  max-height: 14rem;
-  overflow-y: auto;
-}
-.bgform .slot input[type=text] { flex: 1 1 6rem; min-width: 0; }
-.bgform .slot input[type=file] { flex: 0 1 9rem; min-width: 0; border: 0; padding: 0; }
-.bgform .slot button { flex: 0 0 auto; padding: .15rem .5rem; }
-
-/* One shared background per row was three columns fighting over one line,
-   each ellipsed to nothing. Two lines instead: who and what to do with it on
-   top, the dials underneath in full, with air between entries. */
-.bgform .gallery { max-height: 22rem; gap: 0; }
-.bgform .shared {
-  display: block;
-  padding: .5rem 0;
-  border-bottom: 1px solid var(--rule);
-}
-.bgform .shared:last-child { border-bottom: 0; }
-.bgform .shared span {
-  display: inline-block;
-  margin-right: .6rem;
-  color: var(--ink);
-}
-.bgform .shared code {
-  display: block;
-  margin-top: .3rem;
-  color: var(--faint);
-  font-size: .72rem;
-  white-space: normal;
-  word-break: break-word;
-}
-.bgform .shared .btn,
-.bgform .shared button { padding: .1rem .5rem; margin-right: .3rem; vertical-align: baseline; }
-
-/* An anchor that behaves like a button, for the actions that are genuinely
-   navigations — `see it` goes to a page, and pretending otherwise would cost
-   the reader middle-click and open-in-new-tab for no reason. */
-.bgform .btn {
-  font: inherit;
-  display: inline-block;
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid var(--ink);
-  padding: .25rem .7rem;
-  text-decoration: none;
-  cursor: pointer;
-}
-.bgform .btn:hover { background: var(--ink); color: var(--paper); }
-.bgform button[disabled] { opacity: .4; cursor: default; }
 .bgform button {
   font: inherit;
   background: var(--paper);
@@ -445,14 +335,3 @@ ol.clues        { font-size: .9rem; }
 ol.clues li     { margin-bottom: .3rem; }
 .clueset        { display: grid; gap: 0 2rem; grid-template-columns: 1fr; }
 @media (min-width: 40rem) { .clueset { grid-template-columns: 1fr 1fr; } }
-
-/* The two picture programs on the playground are the only ones whose output
-   depends on something the reader supplies, so their captions carry a way to
-   supply it. */
-figure.tm figcaption .pics {
-  margin-left: .5rem;
-  color: var(--faint);
-  text-decoration: none;
-  white-space: nowrap;
-}
-figure.tm figcaption .pics:hover { color: var(--ink); text-decoration: underline; }

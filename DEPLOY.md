@@ -16,10 +16,10 @@ user it will run as, or where it will be checked out. All three live in
 | unit | what | port |
 |---|---|---|
 | `garden` | the site. GET only, single threaded, loopback | 8000 |
-| `garden-hook` | the deploy webhook and the gallery api, loopback | 8001 |
+| `garden-hook` | the deploy webhook and status, loopback | 8001 |
 | `nginx` | the only thing listening publicly | 80 |
 
-nginx sends `/deploy` and `/api/` to `hookd` and everything else to `garden`.
+nginx sends `/deploy` and `/api/status` to `hookd` and everything else to `garden`.
 Both back ends bind `127.0.0.1`, so nginx is the only way in.
 
 `hookd` is a separate process rather than a branch inside `garden.c` for two
@@ -108,12 +108,6 @@ Logs: `/var/lib/garden/deploy.log`, and `journalctl -u garden-hook`.
   request carrying neither is refused — there is no third branch.
 - `hookd` carries its own SHA-256, so it links neither lua nor libcrypto.
   `make check` runs it against the FIPS 180-4 and RFC 4231 vectors.
-- The gallery is **publicly writable**. Submissions are rebuilt field by field
-  against a whitelist rather than filtered: unknown keys are dropped, numbers
-  are clamped to the range the control offers, enums must match exactly. Body
-  capped at 2K, five posts per minute per IP, one hundred entries total, oldest dropped first, and
-  no file uploads at all. There is no moderation — names are the one string
-  strangers control, and they are rendered with `textContent`.
 - `garden.conf` is `640`, owned `root:<service user>`. It lives outside the
   repo because `deploy.sh` runs a hard reset, and a secret in the working tree
   would be destroyed by it — or committed.
@@ -121,7 +115,7 @@ Logs: `/var/lib/garden/deploy.log`, and `journalctl -u garden-hook`.
 ## files
 
     deploy.sh                    the deploy itself
-    src/hookd.c                  webhook + gallery api
+    src/hookd.c                  webhook + status endpoint
     deploy/bootstrap.sh          one-time setup, renders the templates
     deploy/trigger.sh            deploy or query status by hand
     deploy/garden.service        unit template
@@ -143,7 +137,6 @@ State, none of it in the repo:
 
     /etc/garden/garden.conf      secret, ports, paths, hostnames
     /var/lib/garden/deployed.sha the commit that is serving
-    /var/lib/garden/gallery.tsv  shared backgrounds
     /var/lib/garden/deploy.log
 
 ## a caveat about generated media

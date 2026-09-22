@@ -1,26 +1,8 @@
-/* hookd.c — the POST surface. Deploys, and the shared background gallery.
+/* hookd.c — authenticated deploy webhook and status endpoint.
  *
- * garden.c speaks GET and nothing else, one request per connection, one at a
- * time. That is the right shape for a site and the wrong one for a deploy
- * hook, so the two things that need POST live in their own process.
- *
- * Separation is not tidiness. This is the program that restarts garden, and a
- * server cannot restart itself and still answer the request that asked it to.
- * hookd is never restarted by a deploy unless its own source changed, and
- * even then it is systemd that does it, after we have exited.
- *
- *   POST /deploy        a push. HMAC-SHA256 over the body, then deploy.sh.
- *   GET  /api/status    which commit is actually serving. the deploy's test.
- *   GET  /api/gallery   backgrounds people have shared.
- *   POST /api/gallery   share one. public, so nothing is trusted.
- *
- * No libcrypto and no lua: SHA-256 is a hundred lines and linking a TLS stack
- * to hash sixty bytes is the kind of dependency this repo exists without.
- *
- * The gallery is a tab-separated text file. One entry per line, the filename
- * is the database. That is the same claim blocks/ makes, and it holds for the
- * same reason: two hundred entries of a few hundred bytes is smaller than one
- * of the fonts, so the whole file is read, rewritten and renamed into place.
+ * garden serves the site. This separate loopback process verifies a push,
+ * starts deploy.sh, and reports which commit is serving. It keeps no content
+ * or visitor state.
  */
 #define _GNU_SOURCE
 #include <ctype.h>
@@ -31,19 +13,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
 
 #define HDR_MAX     16384
 #define BODY_MAX    1048576      /* github push payloads are not small */
-#define GALLERY_CAP 100          /* hard ceiling; GALLERY_MAX may lower it */
-#define ENTRY_MAX   1024
-#define LINE_MAX    2048
 
 /* ------------------------------------------------------------------ sha256 */
 /* FIPS 180-4. Straight out of the spec, no tricks, verified against the
@@ -207,7 +184,6 @@ static char SECRET[256]    = "";
 static char REPO_DIR[512]  = ".";
 static char STATE_DIR[512] = "/var/lib/garden";
 static int  HOOK_PORT      = 8001;
-static int  GALLERY_MAX    = GALLERY_CAP;
 
 static void trim(char *s)
 {
@@ -240,18 +216,23 @@ static void load_conf(const char *path)
         else if (!strcmp(k, "REPO_DIR"))      snprintf(REPO_DIR, sizeof REPO_DIR, "%s", v);
         else if (!strcmp(k, "STATE_DIR"))     snprintf(STATE_DIR, sizeof STATE_DIR, "%s", v);
         else if (!strcmp(k, "HOOK_PORT"))     HOOK_PORT = atoi(v);
-        else if (!strcmp(k, "GALLERY_MAX")) {
-            int n = atoi(v);
-            /* The config may lower the ceiling but never raise it: the read
-             * buffer is sized from GALLERY_CAP, so a larger value would be a
-             * config file quietly deciding how much memory to allocate. */
-            if (n > 0 && n <= GALLERY_CAP) GALLERY_MAX = n;
-        }
     }
     fclose(f);
 }
 
 /* -------------------------------------------------------------------- http */
+
+static int write_all(int fd, const char *p, size_t n)
+{
+    while (n) {
+        ssize_t wrote = write(fd, p, n);
+        if (wrote < 0) { if (errno == EINTR) continue; return -1; }
+        if (wrote == 0) return -1;
+        p += wrote;
+        n -= (size_t)wrote;
+    }
+    return 0;
+}
 
 static void respond(int fd, const char *status, const char *ctype,
                     const char *body, size_t len)
@@ -265,8 +246,8 @@ static void respond(int fd, const char *status, const char *ctype,
         "X-Content-Type-Options: nosniff\r\n"
         "Connection: close\r\n\r\n",
         status, ctype, len);
-    if (write(fd, head, (size_t)n) < 0) return;
-    if (len && write(fd, body, len) < 0) return;
+    if (write_all(fd, head, (size_t)n) < 0) return;
+    if (len) write_all(fd, body, len);
 }
 
 static void json(int fd, const char *status, const char *fmt, ...)
@@ -278,6 +259,7 @@ static void json(int fd, const char *status, const char *fmt, ...)
     n = vsnprintf(body, sizeof body, fmt, ap);
     va_end(ap);
     if (n < 0) n = 0;
+    if ((size_t)n >= sizeof body) n = (int)sizeof body - 1;
     respond(fd, status, "application/json; charset=utf-8", body, (size_t)n);
 }
 
@@ -309,25 +291,6 @@ static int header(const char *hdrs, const char *name, char *out, size_t cap)
     return 0;
 }
 
-static char *read_file(const char *path, size_t *lenp)
-{
-    FILE *f = fopen(path, "rb");
-    char *buf;
-    long n;
-    if (!f) return NULL;
-    fseek(f, 0, SEEK_END);
-    n = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (n < 0 || n > (long)(GALLERY_CAP * ENTRY_MAX * 2)) { fclose(f); return NULL; }
-    buf = malloc((size_t)n + 1);
-    if (!buf) { fclose(f); return NULL; }
-    if (fread(buf, 1, (size_t)n, f) != (size_t)n) { free(buf); fclose(f); return NULL; }
-    buf[n] = '\0';
-    fclose(f);
-    if (lenp) *lenp = (size_t)n;
-    return buf;
-}
-
 static void read_line_file(const char *path, char *out, size_t cap,
                            const char *dflt)
 {
@@ -339,18 +302,29 @@ static void read_line_file(const char *path, char *out, size_t cap,
     fclose(f);
 }
 
+/* A full git object name, or a future longer hash: hexadecimal and bounded. */
+static int hex_ok(const char *s)
+{
+    size_t i;
+    if (!s || !*s || strlen(s) > 64) return 0;
+    for (i = 0; s[i]; i++)
+        if (!isxdigit((unsigned char)s[i])) return 0;
+    return 1;
+}
+
 /* ----------------------------------------------------------------- deploy */
 
 /* Detached: the caller gets a 202 and hangs up. GitHub allows a webhook about
  * ten seconds and a clean build plus a restart plus the health check does not
  * reliably fit in ten, and a hook that times out is a hook GitHub starts
  * calling broken. SIGCHLD is ignored in main(), so nothing is left to reap. */
-static void spawn_deploy(void)
+static int spawn_deploy(void)
 {
     pid_t pid = fork();
     char script[1024];
 
-    if (pid != 0) return;                  /* parent, or fork failed */
+    if (pid < 0) return -1;
+    if (pid > 0) return 0;
 
     setsid();
 
@@ -370,478 +344,6 @@ static void spawn_deploy(void)
     freopen("/dev/null", "w", stderr);
     execl("/bin/bash", "bash", script, (char *)NULL);
     _exit(127);
-}
-
-/* ---------------------------------------------------------------- gallery */
-
-/* Everything below rebuilds a submission rather than sanitising one. An entry
- * is constructed field by field out of what is named here, and anything not
- * named never reaches the file. A filter has to imagine every attack; a
- * whitelist only has to name the ten things that are allowed. */
-
-struct num_opt { const char *key; double lo, hi; };
-static const struct num_opt NUM_OPTS[] = {
-    { "fps", 1, 60 }, { "speed", 0, 4 }, { "scale", 0.2, 4 },
-    { "size", 4, 24 }, { "fade", 0.05, 1 }, { "driftspeed", 0, 5 },
-    /* The picture dials. `img` names a slot rather than carrying one, so a
-     * shared background renders against whatever the reader has in it. */
-    { "img", 1, 5 }, { "gain", 0.4, 4 }, { "maskthr", 0, 1 },
-    { "maskspeed", 0, 4 },
-    { NULL, 0, 0 }
-};
-static const char *DRIFT_OK[] = { "nav", "body", "all", "none", NULL };
-static const char *RD_OK[] = {
-    "worms", "solitons", "mitosis", "coral", "spots", "maze", "holes",
-    "chaos", "flower", "moving", NULL
-};
-static const char *FIT_OK[] = { "cover", "contain", "tile", NULL };
-/* Checkboxes. The client writes "1" or clears the key entirely, and an empty
- * value is dropped before it reaches here, so "1" is the only word to allow. */
-static const char *FLAG_OK[] = { "1", NULL };
-
-static int in_list(const char *const *list, const char *v)
-{
-    int i;
-    for (i = 0; list[i]; i++) if (!strcmp(list[i], v)) return 1;
-    return 0;
-}
-
-/* An id, the same rule the server applies to `skin` and the client to a
- * program name. */
-static int id_ok(const char *s)
-{
-    size_t i;
-    if (!s || !*s || strlen(s) > 32) return 0;
-    for (i = 0; s[i]; i++)
-        if (!isalnum((unsigned char)s[i]) && s[i] != '_' && s[i] != '-') return 0;
-    return 1;
-}
-
-/* A git object name: hex, and long enough to hold a full one. */
-static int hex_ok(const char *s)
-{
-    size_t i;
-    if (!s || !*s || strlen(s) > 64) return 0;
-    for (i = 0; s[i]; i++) if (!isxdigit((unsigned char)s[i])) return 0;
-    return 1;
-}
-
-static void pct_decode(char *s)
-{
-    char *o = s;
-    const char *p = s;
-    while (*p) {
-        if (*p == '+') { *o++ = ' '; p++; }
-        else if (*p == '%' && isxdigit((unsigned char)p[1]) &&
-                              isxdigit((unsigned char)p[2])) {
-            char h[3] = { p[1], p[2], 0 };
-            unsigned v = (unsigned)strtoul(h, NULL, 16);
-            if (v == 0) { p += 3; continue; }      /* no NUL injection */
-            *o++ = (char)v;
-            p += 3;
-        } else *o++ = *p++;
-    }
-    *o = '\0';
-}
-
-/* Pull one field out of an urlencoded body. The client sends
- * URLSearchParams, which is the least amount of parser on both ends. */
-static int field(const char *body, const char *key, char *out, size_t cap)
-{
-    size_t klen = strlen(key);
-    const char *p = body;
-
-    out[0] = '\0';
-    while (p && *p) {
-        const char *amp = strchr(p, '&');
-        size_t seg = amp ? (size_t)(amp - p) : strlen(p);
-        if (seg > klen && p[klen] == '=' && !strncmp(p, key, klen)) {
-            size_t len = seg - klen - 1;
-            if (len >= cap) len = cap - 1;
-            memcpy(out, p + klen + 1, len);
-            out[len] = '\0';
-            pct_decode(out);
-            return 1;
-        }
-        p = amp ? amp + 1 : NULL;
-    }
-    return 0;
-}
-
-/* Names are shown to other people. The client renders them with textContent
- * so markup in one is inert; this is about the file, where a tab or a newline
- * would end the field or the record. */
-static void clean_text(const char *in, char *out, size_t cap, const char *dflt)
-{
-    size_t o = 0;
-    size_t i;
-    for (i = 0; in[i] && o < cap - 1; i++) {
-        unsigned char c = (unsigned char)in[i];
-        if (c == '\t' || c == '\n' || c == '\r') { out[o++] = ' '; continue; }
-        if (c < 0x20 || c == 0x7f) continue;
-        out[o++] = (char)c;
-    }
-    out[o] = '\0';
-    while (o && out[o-1] == ' ') out[--o] = '\0';
-    if (!out[0] && dflt) snprintf(out, cap, "%s", dflt);
-}
-
-/* Rebuild `bgopts`: one line of k=v pairs, the format the block header and
- * the query string already use. Unknown keys are dropped, numbers are
- * clamped to the range the slider offers, enums must match exactly. */
-static void clean_opts(const char *in, char *out, size_t cap)
-{
-    char work[LINE_MAX];
-    char *save = NULL, *tok;
-    size_t o = 0;
-
-    out[0] = '\0';
-    snprintf(work, sizeof work, "%s", in);
-
-    for (tok = strtok_r(work, " \t;", &save); tok;
-         tok = strtok_r(NULL, " \t;", &save)) {
-        char *eq = strchr(tok, '=');
-        char key[64], val[128];
-        int i, ok = 0;
-
-        if (!eq || eq == tok) continue;
-        *eq = '\0';
-        snprintf(key, sizeof key, "%s", tok);
-        snprintf(val, sizeof val, "%s", eq + 1);
-        if (!val[0]) continue;
-
-        for (i = 0; NUM_OPTS[i].key; i++) {
-            if (strcmp(key, NUM_OPTS[i].key)) continue;
-            {
-                char *end;
-                double d = strtod(val, &end);
-                if (end == val || *end) break;          /* not a number */
-                if (!(d >= NUM_OPTS[i].lo && d <= NUM_OPTS[i].hi)) break;
-                snprintf(val, sizeof val, "%g", d);
-                ok = 1;
-            }
-            break;
-        }
-
-        if (!ok && !strcmp(key, "drift") && in_list(DRIFT_OK, val)) ok = 1;
-        if (!ok && !strcmp(key, "rd")    && in_list(RD_OK, val))    ok = 1;
-        if (!ok && !strcmp(key, "fit")   && in_list(FIT_OK, val))   ok = 1;
-        if (!ok && (!strcmp(key, "maskinv") || !strcmp(key, "masksoft"))
-                && in_list(FLAG_OK, val)) ok = 1;
-
-        /* seed, word and masktext are drawn, never executed. Bounded so one
-         * entry cannot be a kilobyte, and rejected if they contain a space:
-         * `bgopts` is one line of space-separated pairs, so a value with a
-         * space in it does not survive its own permalink. */
-        if (!ok && (!strcmp(key, "seed") || !strcmp(key, "word")
-                                         || !strcmp(key, "masktext"))) {
-            char clean[64];
-            clean_text(val, clean, sizeof clean, NULL);
-            if (!clean[0]) continue;
-            snprintf(val, sizeof val, "%.*s",
-                     !strcmp(key, "seed") ? 32 : 24, clean);
-            if (strchr(val, ' ')) continue;             /* one token only */
-            ok = 1;
-        }
-
-        if (!ok) continue;
-        if (o + strlen(key) + strlen(val) + 2 >= cap) break;
-        o += (size_t)snprintf(out + o, cap - o, "%s%s=%s", o ? " " : "", key, val);
-    }
-}
-
-static void json_escape(const char *in, char *out, size_t cap)
-{
-    size_t o = 0;
-    size_t i;
-    for (i = 0; in[i] && o + 7 < cap; i++) {
-        unsigned char c = (unsigned char)in[i];
-        if (c == '"' || c == '\\') { out[o++] = '\\'; out[o++] = (char)c; }
-        else if (c < 0x20) o += (size_t)snprintf(out + o, cap - o, "\\u%04x", c);
-        else out[o++] = (char)c;
-    }
-    out[o] = '\0';
-}
-
-static void gallery_path(char *out, size_t cap)
-{
-    snprintf(out, cap, "%s/gallery.tsv", STATE_DIR);
-}
-
-/* A line is  id, at, tok, name, bg, chars, opts  — tab separated, newest
- * first. `opts` is last because it is the only field allowed to contain
- * spaces, and last means "the rest of the line".
- *
- * `tok` is sha256 of the secret handed back when the entry was posted. It
- * proves nothing about who somebody is and is not meant to: it only says
- * this browser is the one that submitted this entry, which is exactly the
- * claim a delete button has to make. It is never sent to anyone. */
-#define FIELDS 7
-
-static int split_entry(char *line, char *f[FIELDS])
-{
-    char *p = line;
-    int i;
-    for (i = 0; i < FIELDS; i++) {
-        f[i] = p;
-        if (i < FIELDS - 1) {
-            char *t = strchr(p, '\t');
-            if (!t) return 0;
-            *t = '\0';
-            p = t + 1;
-        }
-    }
-    return 1;
-}
-
-static void gallery_get(int fd)
-{
-    char path[600], *buf;
-    char *out;
-    size_t o = 0, cap = (size_t)GALLERY_CAP * ENTRY_MAX * 3;
-    char *line, *save = NULL;
-    int first = 1;
-
-    gallery_path(path, sizeof path);
-    out = malloc(cap);
-    if (!out) { json(fd, "500 Internal Server Error", "{\"error\":\"oom\"}"); return; }
-
-    o += (size_t)snprintf(out + o, cap - o, "{\"entries\":[");
-
-    buf = read_file(path, NULL);
-    if (buf) {
-        for (line = strtok_r(buf, "\n", &save); line;
-             line = strtok_r(NULL, "\n", &save)) {
-            char *f[FIELDS], esc[ENTRY_MAX];
-
-            if (!split_entry(line, f)) continue;        /* malformed, skip */
-            if (o + ENTRY_MAX * 2 >= cap) break;
-
-            o += (size_t)snprintf(out + o, cap - o, "%s{", first ? "" : ",");
-            first = 0;
-            json_escape(f[0], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"id\":\"%s\",", esc);
-            json_escape(f[1], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"at\":\"%s\",", esc);
-            /* f[2] is the token hash and stays here. */
-            json_escape(f[3], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"name\":\"%s\",", esc);
-            json_escape(f[4], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"bg\":\"%s\",", esc);
-            json_escape(f[5], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"chars\":\"%s\",", esc);
-            json_escape(f[6], esc, sizeof esc);
-            o += (size_t)snprintf(out + o, cap - o, "\"opts\":\"%s\"}", esc);
-        }
-        free(buf);
-    }
-
-    o += (size_t)snprintf(out + o, cap - o, "]}");
-    respond(fd, "200 OK", "application/json; charset=utf-8", out, o);
-    free(out);
-}
-
-/* Remove one entry, if the caller can prove it posted it. */
-static void gallery_delete(int fd, const char *body)
-{
-    char id[32], token[128], want[65], path[600], tmp[620];
-    uint8_t dig[32];
-    char *old, *line, *save = NULL;
-    FILE *f;
-    int found = 0, denied = 0, kept = 0;
-
-    if (!field(body, "id", id, sizeof id) || !hex_ok(id)) {
-        json(fd, "400 Bad Request", "{\"error\":\"bad id\"}");
-        return;
-    }
-    if (!field(body, "token", token, sizeof token) || !token[0]) {
-        json(fd, "403 Forbidden", "{\"error\":\"no token\"}");
-        return;
-    }
-    { sha256 s; sha256_init(&s); sha256_update(&s, token, strlen(token));
-      sha256_final(&s, dig); }
-    hex(dig, 32, want);
-
-    gallery_path(path, sizeof path);
-    old = read_file(path, NULL);
-    if (!old) { json(fd, "404 Not Found", "{\"error\":\"no such entry\"}"); return; }
-
-    snprintf(tmp, sizeof tmp, "%s.tmp", path);
-    f = fopen(tmp, "w");
-    if (!f) { free(old); json(fd, "500 Internal Server Error", "{\"error\":\"cannot write\"}"); return; }
-
-    for (line = strtok_r(old, "\n", &save); line;
-         line = strtok_r(NULL, "\n", &save)) {
-        char copy[LINE_MAX], *fl[FIELDS];
-        snprintf(copy, sizeof copy, "%s", line);
-        /* A line that will not split is one nothing can ever read — an entry
-         * from an older field layout, or a truncated write. Dropping it on
-         * the next rewrite is what makes a format change self-healing;
-         * keeping it would hold a slot against the cap forever while being
-         * invisible to everyone. */
-        if (!split_entry(copy, fl)) continue;
-        if (!strcmp(fl[0], id)) {
-            if (same(fl[2], want)) { found = 1; continue; }   /* dropped */
-            denied = 1;
-        }
-        fprintf(f, "%s\n", line);
-        kept++;
-    }
-    fclose(f);
-    free(old);
-
-    if (!found) {
-        remove(tmp);
-        if (denied) json(fd, "403 Forbidden", "{\"error\":\"not yours\"}");
-        else        json(fd, "404 Not Found", "{\"error\":\"no such entry\"}");
-        return;
-    }
-
-    rename(tmp, path);
-    json(fd, "200 OK", "{\"ok\":true,\"remaining\":%d}", kept);
-}
-
-/* Crude, per-IP, in memory, and reset by a restart. It exists to stop a
- * script filling a disk, not to stop a determined person — the entry cap is
- * what actually bounds the file. */
-#define RATE_SLOTS 256
-#define RATE_WINDOW 60
-#define RATE_MAX 5
-static struct { char ip[46]; time_t hits[RATE_MAX]; } rate[RATE_SLOTS];
-
-static int rate_ok(const char *ip)
-{
-    time_t now = time(NULL);
-    int i, slot = -1, oldest = 0, j;
-    unsigned h = 0;
-
-    for (i = 0; ip[i]; i++) h = h * 31u + (unsigned char)ip[i];
-    slot = (int)(h % RATE_SLOTS);
-
-    if (strcmp(rate[slot].ip, ip)) {           /* new tenant, evict */
-        snprintf(rate[slot].ip, sizeof rate[slot].ip, "%s", ip);
-        memset(rate[slot].hits, 0, sizeof rate[slot].hits);
-    }
-
-    for (j = 0; j < RATE_MAX; j++) {
-        if (now - rate[slot].hits[j] >= RATE_WINDOW) { oldest = j; goto take; }
-    }
-    return 0;
-take:
-    rate[slot].hits[oldest] = now;
-    return 1;
-}
-
-static void gallery_post(int fd, const char *body, const char *ip)
-{
-    char name[128], bg[64], chars[128], opts[512];
-    char raw[512], id[16], path[600], tmp[620];
-    char stamp[32], token[33], tokhash[65];
-    uint8_t dig[32];
-    char hexbuf[65];
-    char *old;
-    FILE *f;
-    time_t now;
-    struct tm tmv;
-    int kept = 0;
-
-    if (!rate_ok(ip)) { json(fd, "429 Too Many Requests", "{\"error\":\"slow down\"}"); return; }
-
-    /* A background is a handful of dials. Nothing legitimate is 4K, and the
-     * generous BODY_MAX exists for github's push payloads, not for this. */
-    if (strlen(body) > 4096) {
-        json(fd, "413 Payload Too Large", "{\"error\":\"too large\"}");
-        return;
-    }
-
-    if (!field(body, "bg", bg, sizeof bg) || !id_ok(bg)) {
-        json(fd, "400 Bad Request", "{\"error\":\"bad bg\"}");
-        return;
-    }
-    field(body, "name", raw, sizeof raw);
-    clean_text(raw, name, sizeof name, "untitled");
-    if (strlen(name) > 48) name[48] = '\0';
-    /* Belt and braces. The client renders names with textContent and the
-     * JSON is escaped on the way out, so markup in a name is already inert —
-     * but this is the one public-writable string on the box, and it costs
-     * nothing to make sure it can never be a tag whoever renders it next.
-     * Only names: `<` and `>` are legitimate glyphs in a charset ramp. */
-    {
-        char *p;
-        size_t n;
-        for (p = name; *p; p++) if (*p == '<' || *p == '>') *p = ' ';
-        n = strlen(name);
-        while (n && name[n-1] == ' ') name[--n] = '\0';
-        if (!name[0]) snprintf(name, sizeof name, "untitled");
-    }
-
-    field(body, "chars", raw, sizeof raw);
-    clean_text(raw, chars, sizeof chars, NULL);
-    if (strlen(chars) > 96) chars[96] = '\0';
-
-    field(body, "opts", raw, sizeof raw);
-    clean_opts(raw, opts, sizeof opts);
-
-    /* The id is a hash of the background, not of the submission: sharing a
-     * field somebody already shared should replace it, not double it. */
-    snprintf(raw, sizeof raw, "%s|%s|%s", bg, chars, opts);
-    { sha256 s; sha256_init(&s); sha256_update(&s, raw, strlen(raw)); sha256_final(&s, dig); }
-    hex(dig, 32, hexbuf);
-    snprintf(id, sizeof id, "%.12s", hexbuf);
-
-    now = time(NULL);
-    gmtime_r(&now, &tmv);
-    strftime(stamp, sizeof stamp, "%Y-%m-%dT%H:%M:%SZ", &tmv);
-
-    /* The delete token. Random, returned once, and stored only as a hash —
-     * so the file that a deletion is checked against never contains anything
-     * that would let somebody perform one. */
-    {
-        uint8_t rnd[16];
-        FILE *ur = fopen("/dev/urandom", "rb");
-        size_t got = ur ? fread(rnd, 1, sizeof rnd, ur) : 0;
-        if (ur) fclose(ur);
-        if (got != sizeof rnd) {
-            json(fd, "500 Internal Server Error", "{\"error\":\"no entropy\"}");
-            return;
-        }
-        hex(rnd, sizeof rnd, token);
-        { sha256 s; sha256_init(&s); sha256_update(&s, token, strlen(token));
-          sha256_final(&s, dig); }
-        hex(dig, 32, tokhash);
-    }
-
-    gallery_path(path, sizeof path);
-    snprintf(tmp, sizeof tmp, "%s.tmp", path);
-
-    f = fopen(tmp, "w");
-    if (!f) { json(fd, "500 Internal Server Error", "{\"error\":\"cannot write\"}"); return; }
-
-    fprintf(f, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-            id, stamp, tokhash, name, bg, chars, opts);
-    kept = 1;
-
-    old = read_file(path, NULL);
-    if (old) {
-        char *line, *save = NULL;
-        for (line = strtok_r(old, "\n", &save); line;
-             line = strtok_r(NULL, "\n", &save)) {
-            char copy[LINE_MAX], *fl[FIELDS];
-            if (!strncmp(line, id, 12) && line[12] == '\t') continue;  /* replaced */
-            snprintf(copy, sizeof copy, "%s", line);
-            if (!split_entry(copy, fl)) continue;      /* unreadable, drop it */
-            /* Newest first, so anything past the cap is the oldest there is
-             * and simply stops being written. */
-            if (kept >= GALLERY_MAX) break;
-            fprintf(f, "%s\n", line);
-            kept++;
-        }
-        free(old);
-    }
-    fclose(f);
-    rename(tmp, path);
-
-    json(fd, "201 Created", "{\"ok\":true,\"id\":\"%s\",\"token\":\"%s\"}", id, token);
 }
 
 /* ----------------------------------------------------------------- status */
@@ -958,7 +460,6 @@ static void handle(int fd)
 
     if (!strcmp(method, "GET")) {
         if (!strcmp(path, "/api/status"))  { status_get(fd);  goto done; }
-        if (!strcmp(path, "/api/gallery")) { gallery_get(fd); goto done; }
         json(fd, "404 Not Found", "{\"error\":\"not found\"}");
         goto done;
     }
@@ -980,29 +481,18 @@ static void handle(int fd)
             }
             printf("hookd: deploy accepted from %s\n", ip);
             fflush(stdout);
-            spawn_deploy();
+            if (spawn_deploy() < 0) {
+                json(fd, "500 Internal Server Error", "{\"error\":\"could not fork\"}");
+                goto done;
+            }
             json(fd, "202 Accepted", "{\"ok\":true,\"deploying\":true}");
             goto done;
         }
-        if (!strcmp(path, "/api/gallery")) { gallery_post(fd, body, ip); goto done; }
         json(fd, "404 Not Found", "{\"error\":\"not found\"}");
         goto done;
     }
 
-    if (!strcmp(method, "DELETE")) {
-        if (!strcmp(path, "/api/gallery")) {
-            if (!rate_ok(ip)) {
-                json(fd, "429 Too Many Requests", "{\"error\":\"slow down\"}");
-                goto done;
-            }
-            gallery_delete(fd, body);
-            goto done;
-        }
-        json(fd, "404 Not Found", "{\"error\":\"not found\"}");
-        goto done;
-    }
-
-    json(fd, "405 Method Not Allowed", "{\"error\":\"GET, POST or DELETE\"}");
+    json(fd, "405 Method Not Allowed", "{\"error\":\"GET or POST\"}");
 
 done:
     free(body);

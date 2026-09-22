@@ -18,9 +18,9 @@ all: garden hookd
 garden: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDLIBS)
 
-# The deploy hook and the gallery. No lua and no libcrypto: it hashes sixty
-# bytes and runs one script, and linking a TLS stack for that is the kind of
-# dependency this repo is written without.
+# The deploy hook. No lua and no libcrypto: it hashes sixty bytes and runs one
+# script, and linking a TLS stack for that is the kind of dependency this repo
+# is written without.
 hookd: src/hookd.o
 	$(CC) $(CFLAGS) -o $@ $<
 
